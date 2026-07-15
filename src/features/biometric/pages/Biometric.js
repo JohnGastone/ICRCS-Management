@@ -2,6 +2,20 @@ import React, { useState } from 'react';
 import { Search, Globe, AlertCircle, Loader2, Eye, Camera, CheckCircle, X, XCircle, Fingerprint, ChevronDown, Filter, FileCheck, SendHorizontal, StickyNote, Upload, Pen, RefreshCw, AlertTriangle, Sun, Image, User, FolderOpen, ClipboardList, MessageSquare, ArrowLeft, Download, FileText, Clock, ArrowUpDown } from 'lucide-react';
 import ApplicantInfoView from '../../../components/common/ApplicantInfoView';
 import { buildApplicant } from '../../../data/mockApplicantData';
+import {
+  startCapture,
+  startGroupCapture,
+  pollUntilTerminal,
+  POSITION_TO_FINGER,
+  FINGER_TO_POSITION,
+  GROUP_KEY_TO_DEVICE,
+} from '../../../services/deviceService';
+
+// Minimum scanner qualityScore to accept a finger. RSWAS/UFExtractor returns an
+// NFIQ-style 0-100 score (higher is better); 60 is the "Acceptable" floor used by
+// getQualityLabel below. Adjust here if real-hardware testing shows a different
+// scale. (See icrcs-device-service README - the scale is unverified vs hardware.)
+const MIN_ACCEPTABLE_QUALITY = 60;
 
 const mockPortalApps = {
   'APP-2026-000145': {
@@ -121,6 +135,9 @@ export default function Biometric() {
   });
   const [selectedFinger, setSelectedFinger] = useState(null);
   const [scanningFinger, setScanningFinger] = useState(null);
+  // base64 image + ISO template per captured finger, keyed [hand][name] - held in
+  // a ref so it survives re-renders without triggering them; read at enrollment.
+  const capturedArtifactsRef = React.useRef({ left: {}, right: {}, thumbs: {} });
   const [commentModal, setCommentModal] = useState({ open: false, hand: '', name: '', label: '', comment: '' });
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(5);
@@ -233,6 +250,7 @@ export default function Biometric() {
     setFingerprints({ left: { index: 'pending', middle: 'pending', ring: 'pending', pinky: 'pending' }, right: { index: 'pending', middle: 'pending', ring: 'pending', pinky: 'pending' }, thumbs: { left: 'pending', right: 'pending' } });
     setFpQuality({ left: { index: 0, middle: 0, ring: 0, pinky: 0 }, right: { index: 0, middle: 0, ring: 0, pinky: 0 }, thumbs: { left: 0, right: 0 } });
     setFpComments({ left: { index: '', middle: '', ring: '', pinky: '' }, right: { index: '', middle: '', ring: '', pinky: '' }, thumbs: { left: '', right: '' } });
+    capturedArtifactsRef.current = { left: {}, right: {}, thumbs: {} };
     setSelectedFinger(null);
     setScanningFinger(null);
     setCommentModal({ open: false, hand: '', name: '', label: '', comment: '' });
@@ -263,22 +281,18 @@ export default function Biometric() {
     if (q >= 60) return { label: 'Acceptable', badgeClass: 'bg-sky-50 text-sky-700 border-sky-200' };
     return { label: 'Poor', badgeClass: 'bg-red-50 text-red-600 border-red-200' };
   };
-  const simulateFingerCapture = (hand, name) => {
-    if (scanningFinger) return;
-    setScanningFinger({ hand, name });
-    setFingerprints(fp => ({ ...fp, [hand]: { ...fp[hand], [name]: 'capturing' } }));
-    setTimeout(() => {
-      const quality = Math.floor(Math.random() * 45) + 55;
-      const finalStatus = quality >= 60 ? 'captured' : 'failed';
-      setScanningFinger(null);
-      setFingerprints(fp => ({ ...fp, [hand]: { ...fp[hand], [name]: finalStatus } }));
-      setFpQuality(q => ({ ...q, [hand]: { ...q[hand], [name]: quality } }));
-    }, 1200);
+  const setGroupStatus = (fingers, status) => {
+    setFingerprints(fp => {
+      const next = { ...fp };
+      fingers.forEach(f => { next[f.hand] = { ...next[f.hand], [f.name]: status }; });
+      return next;
+    });
   };
   const recaptureFinger = (hand, name) => {
     setFingerprints(fp => ({ ...fp, [hand]: { ...fp[hand], [name]: 'pending' } }));
     setFpQuality(q => ({ ...q, [hand]: { ...q[hand], [name]: 0 } }));
     setFpComments(c => ({ ...c, [hand]: { ...c[hand], [name]: '' } }));
+    delete capturedArtifactsRef.current[hand][name];
   };
   const openCommentModal = (hand, name) => {
     const label = getFingerLabel(hand, name);
@@ -291,7 +305,10 @@ export default function Biometric() {
     setFpComments(c => ({ ...c, [hand]: { ...c[hand], [name]: comment } }));
     setCommentModal({ open: false, hand: '', name: '', label: '', comment: '' });
   };
-  const captureGroup = (groupKey) => {
+  // One physical placement on the RealScan-G10 captures a whole group at once;
+  // icrcs-device-service returns one result per finger. We start the job, poll
+  // until it's terminal, then fan the per-finger results back into the UI state.
+  const captureGroup = async (groupKey) => {
     if (scanningFinger) return;
     const groupMap = {
       left: [{ hand: 'left', name: 'index' }, { hand: 'left', name: 'middle' }, { hand: 'left', name: 'ring' }, { hand: 'left', name: 'pinky' }],
@@ -301,20 +318,79 @@ export default function Biometric() {
     const fingers = groupMap[groupKey];
     const pending = fingers.filter(f => fingerprints[f.hand][f.name] === 'pending');
     if (pending.length === 0) return;
-    pending.forEach((item, i) => {
-      setTimeout(() => simulateFingerCapture(item.hand, item.name), i * 700);
-    });
-  };
-  const captureAllPending = () => {
-    const pending = [];
-    ['left', 'right', 'thumbs'].forEach(hand => {
-      Object.entries(fingerprints[hand]).forEach(([name, status]) => {
-        if (status === 'pending') pending.push({ hand, name });
+
+    setScanningFinger({ group: groupKey });
+    setGroupStatus(pending, 'capturing');
+    try {
+      const jobId = await startGroupCapture(GROUP_KEY_TO_DEVICE[groupKey]);
+      const job = await pollUntilTerminal(jobId);
+      if (job.status !== 'COMPLETED') {
+        setGroupStatus(pending, 'failed');
+        setSuccessMsg(`Fingerprint capture ${job.status.toLowerCase()}${job.errorMessage ? `: ${job.errorMessage}` : ''}.`);
+        setTimeout(clearSuccess, 4000);
+        return;
+      }
+      const seen = new Set();
+      job.results.forEach(result => {
+        const slot = POSITION_TO_FINGER[result.position];
+        if (!slot) return; // ignore composite/slap entries the device may also return
+        seen.add(`${slot.hand}.${slot.name}`);
+        const quality = Math.round(result.qualityScore);
+        const finalStatus = quality >= MIN_ACCEPTABLE_QUALITY ? 'captured' : 'failed';
+        capturedArtifactsRef.current[slot.hand][slot.name] = { rawImage: result.rawImage, template: result.template, quality };
+        setFingerprints(fp => ({ ...fp, [slot.hand]: { ...fp[slot.hand], [slot.name]: finalStatus } }));
+        setFpQuality(q => ({ ...q, [slot.hand]: { ...q[slot.hand], [slot.name]: quality } }));
       });
-    });
-    pending.forEach((item, i) => {
-      setTimeout(() => simulateFingerCapture(item.hand, item.name), i * 700);
-    });
+      // any requested finger the scanner didn't return couldn't be read
+      setGroupStatus(pending.filter(f => !seen.has(`${f.hand}.${f.name}`)), 'failed');
+    } catch (e) {
+      setGroupStatus(pending, 'failed');
+      setSuccessMsg(`Scanner error: ${e instanceof Error ? e.message : String(e)}`);
+      setTimeout(clearSuccess, 5000);
+    } finally {
+      setScanningFinger(null);
+    }
+  };
+  const captureAllPending = async () => {
+    if (scanningFinger) return;
+    for (const groupKey of ['right', 'left', 'thumbs']) {
+      // eslint-disable-next-line no-await-in-loop -- one physical placement at a time
+      await captureGroup(groupKey);
+    }
+  };
+  // Single-finger capture/retry for the currently selected finger.
+  const captureSingleFinger = async (hand, name) => {
+    if (scanningFinger) return;
+    const position = FINGER_TO_POSITION[`${hand}.${name}`];
+    if (!position) return;
+    setScanningFinger({ hand, name });
+    setFingerprints(fp => ({ ...fp, [hand]: { ...fp[hand], [name]: 'capturing' } }));
+    try {
+      const jobId = await startCapture(position);
+      const job = await pollUntilTerminal(jobId);
+      if (job.status !== 'COMPLETED') {
+        setFingerprints(fp => ({ ...fp, [hand]: { ...fp[hand], [name]: 'failed' } }));
+        setSuccessMsg(`Fingerprint capture ${job.status.toLowerCase()}${job.errorMessage ? `: ${job.errorMessage}` : ''}.`);
+        setTimeout(clearSuccess, 4000);
+        return;
+      }
+      const result = job.results.find(r => POSITION_TO_FINGER[r.position]?.hand === hand && POSITION_TO_FINGER[r.position]?.name === name) || job.results[0];
+      if (!result) {
+        setFingerprints(fp => ({ ...fp, [hand]: { ...fp[hand], [name]: 'failed' } }));
+        return;
+      }
+      const quality = Math.round(result.qualityScore);
+      const finalStatus = quality >= MIN_ACCEPTABLE_QUALITY ? 'captured' : 'failed';
+      capturedArtifactsRef.current[hand][name] = { rawImage: result.rawImage, template: result.template, quality };
+      setFingerprints(fp => ({ ...fp, [hand]: { ...fp[hand], [name]: finalStatus } }));
+      setFpQuality(q => ({ ...q, [hand]: { ...q[hand], [name]: quality } }));
+    } catch (e) {
+      setFingerprints(fp => ({ ...fp, [hand]: { ...fp[hand], [name]: 'failed' } }));
+      setSuccessMsg(`Scanner error: ${e instanceof Error ? e.message : String(e)}`);
+      setTimeout(clearSuccess, 5000);
+    } finally {
+      setScanningFinger(null);
+    }
   };
   const getFpProgress = () => {
     const all = [...Object.values(fingerprints.left), ...Object.values(fingerprints.right), ...Object.values(fingerprints.thumbs)];
@@ -1661,10 +1737,10 @@ export default function Biometric() {
                       <div className="flex flex-wrap items-center gap-2">
                         <button onClick={captureAllPending} disabled={scanningFinger} className="px-4 py-2 rounded-xl bg-icrcs-navy text-white text-sm font-semibold hover:bg-icrcs-navy-light transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">Start Capture</button>
                         {selectedFinger && selStatus === 'pending' && (
-                          <button onClick={() => simulateFingerCapture(selectedFinger.hand, selectedFinger.name)} disabled={scanningFinger} className="px-4 py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed">Capture Selected</button>
+                          <button onClick={() => captureSingleFinger(selectedFinger.hand, selectedFinger.name)} disabled={scanningFinger} className="px-4 py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed">Capture Selected</button>
                         )}
                         {selectedFinger && selStatus === 'failed' && (
-                          <button onClick={() => simulateFingerCapture(selectedFinger.hand, selectedFinger.name)} disabled={scanningFinger} className="px-4 py-2 rounded-xl border border-red-200 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"><RefreshCw className="h-3 w-3" /> Retry</button>
+                          <button onClick={() => captureSingleFinger(selectedFinger.hand, selectedFinger.name)} disabled={scanningFinger} className="px-4 py-2 rounded-xl border border-red-200 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"><RefreshCw className="h-3 w-3" /> Retry</button>
                         )}
                         {selectedFinger && (selStatus === 'captured' || selStatus === 'exception') && (
                           <button onClick={() => recaptureFinger(selectedFinger.hand, selectedFinger.name)} disabled={scanningFinger} className="px-4 py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed">Recapture</button>
