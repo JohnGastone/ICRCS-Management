@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ICRCS Design System — Style Reference</title>
+<style>
+  :root {
+    --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+    --font-mono: 'SF Mono', source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+
+    /* Canonical ICRCS tokens */
+    --primary: #005BAC;      --primary-light: #0A6EC8; --primary-dark: #004A8E;
+    --secondary: #0F766E;    --secondary-light: #16918A;
+    --accent: #F59E0B;       --accent-light: #FBBF24;
+    --navy: #0B1D3A;         --navy-light: #132743;    --navy-dark: #060F1E;
+    --gold: #D4AF37;         --gold-light: #E8C84A;    --cream: #F5F5F0;
+    --success: #16A34A;      --success-light: #22C55E;
+    --warning: #D97706;      --warning-dark: #B45309;
+    --danger: #DC2626;
+    --t-bg: #F8FAFC;         --t-surface: #FFFFFF;     --t-border: #E2E8F0;
+    --t-text: #1E293B;       --t-muted: #64748B;       --t-muted-light: #94A3B8;
+
+    /* Page chrome (theme-aware, biased toward the navy accent) */
+    --page: #eef1f6;
+    --panel: #FFFFFF;
+    --panel-2: #F8FAFC;
+    --ink: #1E293B;
+    --ink-soft: #64748B;
+    --line: #E2E8F0;
+    --swatch-ring: rgba(11,29,58,0.10);
+    --shadow-card: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06);
+    --shadow-card-hover: 0 10px 25px -5px rgba(0,0,0,0.08), 0 4px 10px -2px rgba(0,0,0,0.04);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --page: #060f1e;
+      --panel: #0d2038;
+      --panel-2: #0a1a30;
+      --ink: #E8EDF4;
+      --ink-soft: #93A4BC;
+      --line: rgba(255,255,255,0.10);
+      --swatch-ring: rgba(255,255,255,0.14);
+      --shadow-card: 0 1px 3px rgba(0,0,0,0.35), 0 1px 2px rgba(0,0,0,0.45);
+      --shadow-card-hover: 0 14px 30px -8px rgba(0,0,0,0.55);
+    }
+  }
+  :root[data-theme="light"] {
+    --page: #eef1f6; --panel: #FFFFFF; --panel-2: #F8FAFC; --ink: #1E293B;
+    --ink-soft: #64748B; --line: #E2E8F0; --swatch-ring: rgba(11,29,58,0.10);
+    --shadow-card: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06);
+    --shadow-card-hover: 0 10px 25px -5px rgba(0,0,0,0.08), 0 4px 10px -2px rgba(0,0,0,0.04);
+  }
+  :root[data-theme="dark"] {
+    --page: #060f1e; --panel: #0d2038; --panel-2: #0a1a30; --ink: #E8EDF4;
+    --ink-soft: #93A4BC; --line: rgba(255,255,255,0.10); --swatch-ring: rgba(255,255,255,0.14);
+    --shadow-card: 0 1px 3px rgba(0,0,0,0.35), 0 1px 2px rgba(0,0,0,0.45);
+    --shadow-card-hover: 0 14px 30px -8px rgba(0,0,0,0.55);
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  .wrap {
+    font-family: var(--font-sans);
+    background: var(--page);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.6;
+    min-height: 100vh;
+    padding: clamp(16px, 4vw, 44px);
+  }
+  .shell { max-width: 1040px; margin: 0 auto; }
+
+  /* ---- Masthead: the navy + gold sidebar motif ---- */
+  .masthead {
+    border-radius: 20px;
+    overflow: hidden;
+    background: var(--navy);
+    box-shadow: var(--shadow-card-hover);
+    position: relative;
+  }
+  .masthead .rule { height: 6px; background: var(--gold); }
+  .masthead .body { padding: clamp(24px, 4vw, 40px); position: relative; }
+  .masthead .glow {
+    position: absolute; width: 260px; height: 260px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(212,175,55,0.16), transparent 70%);
+    top: -120px; right: -60px; pointer-events: none;
+  }
+  .brandmark {
+    display: inline-flex; align-items: center; gap: 14px; margin-bottom: 22px;
+  }
+  .brandmark .seal {
+    height: 46px; width: 46px; border-radius: 13px;
+    background: var(--gold); color: var(--navy);
+    display: grid; place-items: center; font-weight: 800; font-size: 18px;
+    letter-spacing: -0.5px; box-shadow: 0 6px 16px rgba(212,175,55,0.35);
+  }
+  .brandmark .who { color: #fff; }
+  .brandmark .who b { display: block; font-size: 15px; font-weight: 700; letter-spacing: 0.2px; }
+  .brandmark .who span { display: block; font-size: 12.5px; color: rgba(255,255,255,0.6); }
+  .masthead h1 {
+    margin: 0 0 8px; color: #fff; font-size: clamp(26px, 4.5vw, 38px);
+    font-weight: 800; letter-spacing: -0.8px; text-wrap: balance; line-height: 1.12;
+  }
+  .masthead p { margin: 0; color: rgba(255,255,255,0.72); max-width: 60ch; font-size: 15px; }
+  .masthead .meta {
+    margin-top: 22px; display: flex; flex-wrap: wrap; gap: 8px;
+  }
+  .chip {
+    font-size: 12px; font-weight: 600; letter-spacing: 0.3px;
+    padding: 5px 11px; border-radius: 999px;
+    background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.82);
+    border: 1px solid rgba(255,255,255,0.14);
+  }
+  .chip.gold { background: rgba(212,175,55,0.16); color: var(--gold-light); border-color: rgba(212,175,55,0.3); }
+
+  /* ---- Sections ---- */
+  section { margin-top: 40px; }
+  .eyebrow {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 12px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase;
+    color: var(--ink-soft); margin: 0 0 4px;
+  }
+  .eyebrow::before { content: ""; width: 22px; height: 2px; background: var(--gold); border-radius: 2px; }
+  h2.sec { margin: 0 0 18px; font-size: 22px; font-weight: 750; letter-spacing: -0.4px; }
+  .lede { color: var(--ink-soft); font-size: 14.5px; margin: -10px 0 18px; max-width: 68ch; }
+
+  .grid { display: grid; gap: 14px; }
+  .cols-4 { grid-template-columns: repeat(4, 1fr); }
+  .cols-3 { grid-template-columns: repeat(3, 1fr); }
+  .cols-2 { grid-template-columns: repeat(2, 1fr); }
+  @media (max-width: 760px) { .cols-4 { grid-template-columns: repeat(2,1fr); } .cols-3, .cols-2 { grid-template-columns: 1fr; } }
+
+  /* ---- Color swatches ---- */
+  .swatch {
+    border-radius: 14px; overflow: hidden; background: var(--panel);
+    border: 1px solid var(--line); box-shadow: var(--shadow-card);
+  }
+  .swatch .chipcolor { height: 76px; display: flex; align-items: flex-end; justify-content: flex-end; padding: 8px; }
+  .swatch .info { padding: 10px 12px 12px; }
+  .swatch .name { font-size: 13px; font-weight: 650; }
+  .swatch .hex {
+    font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft);
+    text-transform: uppercase; letter-spacing: 0.4px; margin-top: 1px;
+  }
+  .swatch .cls { font-family: var(--font-mono); font-size: 11px; color: var(--ink-soft); margin-top: 6px; opacity: 0.85; }
+  .dot { height: 22px; width: 22px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.35); }
+
+  /* ---- Panels ---- */
+  .panel {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 18px; padding: 22px; box-shadow: var(--shadow-card);
+  }
+  .panel h3 { margin: 0 0 14px; font-size: 13px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--ink-soft); }
+
+  /* ---- Type scale ---- */
+  .typerow { display: flex; align-items: baseline; gap: 18px; padding: 11px 0; border-top: 1px solid var(--line); }
+  .typerow:first-of-type { border-top: 0; }
+  .typerow .tag { font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft); width: 96px; flex: none; }
+  .typerow .spec { color: var(--ink); }
+  .typerow .px { margin-left: auto; font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft); flex: none; }
+  .t-2xl { font-size: 26px; font-weight: 750; letter-spacing: -0.5px; }
+  .t-xl { font-size: 22px; font-weight: 700; }
+  .t-lg { font-size: 19px; font-weight: 650; }
+  .t-base { font-size: 15px; }
+  .t-sm { font-size: 14px; }
+  .t-xs { font-size: 13px; }
+
+  /* ---- Component specimens ---- */
+  .specimen { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .btn { border: 0; cursor: default; font-family: inherit; font-weight: 600; font-size: 14.5px; border-radius: 12px; padding: 11px 18px; transition: all .2s; }
+  .btn-primary { background: var(--navy); color: #fff; box-shadow: 0 6px 14px rgba(11,29,58,0.28); }
+  .btn-gold { background: var(--gold); color: var(--navy); box-shadow: 0 6px 14px rgba(212,175,55,0.3); }
+  .btn-blue { background: var(--primary); color: #fff; }
+  .btn-ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+  .btn-danger { background: var(--danger); color: #fff; }
+
+  .badge { font-size: 12px; padding: 3px 10px; border-radius: 999px; border: 1px solid; font-weight: 600; }
+  .b-navy { background: rgba(11,29,58,0.10); color: var(--navy); border-color: rgba(11,29,58,0.28); }
+  .b-success { background: rgba(22,163,74,0.12); color: var(--success); border-color: rgba(22,163,74,0.32); }
+  .b-warning { background: rgba(217,119,6,0.12); color: var(--warning); border-color: rgba(217,119,6,0.32); }
+  .b-danger { background: rgba(220,38,38,0.12); color: var(--danger); border-color: rgba(220,38,38,0.32); }
+  .b-primary { background: rgba(0,91,172,0.12); color: var(--primary); border-color: rgba(0,91,172,0.3); }
+  @media (prefers-color-scheme: dark) {
+    .b-navy { background: rgba(212,175,55,0.14); color: var(--gold-light); border-color: rgba(212,175,55,0.3); }
+  }
+  :root[data-theme="dark"] .b-navy { background: rgba(212,175,55,0.14); color: var(--gold-light); border-color: rgba(212,175,55,0.3); }
+
+  .field { max-width: 340px; }
+  .field label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--ink); }
+  .input {
+    width: 100%; padding: 10px 14px; border-radius: 12px;
+    border: 1px solid var(--line); background: var(--panel-2); color: var(--ink);
+    font-family: inherit; font-size: 14px; outline: none;
+  }
+  .input::placeholder { color: var(--ink-soft); }
+  .input:focus { border-color: var(--navy); box-shadow: 0 0 0 3px rgba(11,29,58,0.18); }
+  @media (prefers-color-scheme: dark) { .input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(212,175,55,0.22); } }
+  :root[data-theme="dark"] .input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(212,175,55,0.22); }
+
+  /* Mini card + mini sidebar */
+  .demo-card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow-card); padding: 18px; }
+  .demo-card .rowtop { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .demo-card .ico { height: 40px; width: 40px; border-radius: 11px; background: rgba(11,29,58,0.08); color: var(--navy); display: grid; place-items: center; font-weight: 700; }
+  @media (prefers-color-scheme: dark) { .demo-card .ico { background: rgba(212,175,55,0.16); color: var(--gold-light); } }
+  :root[data-theme="dark"] .demo-card .ico { background: rgba(212,175,55,0.16); color: var(--gold-light); }
+  .demo-card h4 { margin: 0; font-size: 15px; font-weight: 700; }
+  .demo-card .sub { font-size: 12.5px; color: var(--ink-soft); }
+  .demo-card .stat { font-size: 28px; font-weight: 800; letter-spacing: -1px; }
+
+  .mini-nav { background: var(--navy); border-radius: 16px; overflow: hidden; box-shadow: var(--shadow-card); }
+  .mini-nav .top { height: 4px; background: var(--gold); }
+  .mini-nav ul { list-style: none; margin: 0; padding: 12px; display: grid; gap: 4px; }
+  .mini-nav li { font-size: 13.5px; font-weight: 500; color: rgba(255,255,255,0.66); padding: 9px 12px; border-radius: 10px; }
+  .mini-nav li.active { background: var(--gold); color: var(--navy); font-weight: 650; }
+  .mini-nav li.sub { background: rgba(255,255,255,0.10); color: #fff; }
+
+  .metrics { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; }
+  @media (max-width: 620px) { .metrics { grid-template-columns: 1fr; } }
+
+  code.tok { font-family: var(--font-mono); font-size: 12px; background: var(--panel-2); border: 1px solid var(--line); padding: 1px 6px; border-radius: 6px; color: var(--ink); }
+
+  footer.note { margin-top: 44px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--ink-soft); font-size: 13px; }
+  footer.note b { color: var(--ink); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="shell">
+
+    <div class="masthead">
+      <div class="rule"></div>
+      <div class="body">
+        <div class="glow"></div>
+        <div class="brandmark">
+          <div class="seal">IC</div>
+          <div class="who"><b>ICRCS</b><span>Shared Design System</span></div>
+        </div>
+        <h1>One identity across every ICRCS portal</h1>
+        <p>The tokens, type scale, and component conventions that keep ISDMP, the client portal, and biometric capture visually identical. Class names like <span style="color:var(--gold-light);font-family:var(--font-mono);font-size:13px">bg-icrcs-navy</span> mean the same thing everywhere.</p>
+        <div class="meta">
+          <span class="chip gold">Navy #0B1D3A · Gold #D4AF37</span>
+          <span class="chip">Inter</span>
+          <span class="chip">Tailwind 3 + 4</span>
+          <span class="chip">Single source of truth</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- BRAND -->
+    <section>
+      <p class="eyebrow">Palette</p>
+      <h2 class="sec">Brand &amp; institutional</h2>
+      <p class="lede">Navy and gold carry the institutional identity; blue/teal/amber handle interactive brand accents. Reach for tints (<code class="tok">/10</code>, <code class="tok">/20</code>) for depth rather than new colors.</p>
+      <div class="grid cols-4">
+        <div class="swatch"><div class="chipcolor" style="background:#0B1D3A"><span class="dot" style="background:#132743"></span></div><div class="info"><div class="name">ICRCS Navy</div><div class="hex">#0B1D3A</div><div class="cls">bg-icrcs-navy</div></div></div>
+        <div class="swatch"><div class="chipcolor" style="background:#D4AF37"><span class="dot" style="background:#E8C84A"></span></div><div class="info"><div class="name">ICRCS Gold</div><div class="hex">#D4AF37</div><div class="cls">bg-icrcs-gold</div></div></div>
+        <div class="swatch"><div class="chipcolor" style="background:#005BAC"><span class="dot" style="background:#0A6EC8"></span></div><div class="info"><div class="name">Primary</div><div class="hex">#005BAC</div><div class="cls">bg-primary</div></div></div>
+        <div class="swatch"><div class="chipcolor" style="background:#0F766E"><span class="dot" style="background:#16918A"></span></div><div class="info"><div class="name">Secondary</div><div class="hex">#0F766E</div><div class="cls">bg-secondary</div></div></div>
+        <div class="swatch"><div class="chipcolor" style="background:#F59E0B"><span class="dot" style="background:#FBBF24"></span></div><div class="info"><div class="name">Accent</div><div class="hex">#F59E0B</div><div class="cls">bg-accent</div></div></div>
+        <div class="swatch"><div class="chipcolor" style="background:#060F1E"></div><div class="info"><div class="name">Navy Dark</div><div class="hex">#060F1E</div><div class="cls">bg-icrcs-navy-dark</div></div></div>
+        <div class="swatch"><div class="chipcolor" style="background:#F5F5F0"></div><div class="info"><div class="name">Cream</div><div class="hex">#F5F5F0</div><div class="cls">bg-icrcs-cream</div></div></div>
+        <div class="swatch"><div class="chipcolor" style="background:#132743"></div><div class="info"><div class="name">Navy Light</div><div class="hex">#132743</div><div class="cls">bg-icrcs-navy-light</div></div></div>
+      </div>
+    </section>
+
+    <!-- STATE + SURFACE -->
+    <section>
+      <p class="eyebrow">Palette</p>
+      <h2 class="sec">State &amp; surface tokens</h2>
+      <div class="grid cols-2" style="gap:22px">
+        <div class="panel">
+          <h3>Functional / state</h3>
+          <div class="grid cols-3">
+            <div class="swatch"><div class="chipcolor" style="background:#16A34A"><span class="dot" style="background:#22C55E"></span></div><div class="info"><div class="name">Success</div><div class="hex">#16A34A</div></div></div>
+            <div class="swatch"><div class="chipcolor" style="background:#D97706"><span class="dot" style="background:#B45309"></span></div><div class="info"><div class="name">Warning</div><div class="hex">#D97706</div></div></div>
+            <div class="swatch"><div class="chipcolor" style="background:#DC2626"></div><div class="info"><div class="name">Danger</div><div class="hex">#DC2626</div></div></div>
+          </div>
+        </div>
+        <div class="panel">
+          <h3>Surface / neutral (the layout vocabulary)</h3>
+          <div class="grid cols-3">
+            <div class="swatch"><div class="chipcolor" style="background:#F8FAFC;border-bottom:1px solid #E2E8F0"></div><div class="info"><div class="name">Bg</div><div class="hex">#F8FAFC</div></div></div>
+            <div class="swatch"><div class="chipcolor" style="background:#FFFFFF;border-bottom:1px solid #E2E8F0"></div><div class="info"><div class="name">Surface</div><div class="hex">#FFFFFF</div></div></div>
+            <div class="swatch"><div class="chipcolor" style="background:#E2E8F0"></div><div class="info"><div class="name">Border</div><div class="hex">#E2E8F0</div></div></div>
+            <div class="swatch"><div class="chipcolor" style="background:#1E293B"></div><div class="info"><div class="name">Text</div><div class="hex">#1E293B</div></div></div>
+            <div class="swatch"><div class="chipcolor" style="background:#64748B"><span class="dot" style="background:#94A3B8"></span></div><div class="info"><div class="name">Muted</div><div class="hex">#64748B</div></div></div>
+            <div class="swatch"><div class="chipcolor" style="background:#94A3B8"></div><div class="info"><div class="name">Muted Light</div><div class="hex">#94A3B8</div></div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TYPE -->
+    <section>
+      <p class="eyebrow">Typography</p>
+      <h2 class="sec">Type scale — Inter</h2>
+      <p class="lede">Body sits at 15px / 1.6. The scale is custom (note 15px base, not Tailwind's 16px). Load Inter explicitly — the source app references it but never links the webfont, so it silently falls back to system-ui.</p>
+      <div class="panel">
+        <div class="typerow"><span class="tag">2xl</span><span class="spec t-2xl">Status determination</span><span class="px">26 / 2rem</span></div>
+        <div class="typerow"><span class="tag">xl</span><span class="spec t-xl">Case adjudication</span><span class="px">22 / 1.75rem</span></div>
+        <div class="typerow"><span class="tag">lg</span><span class="spec t-lg">Applicant assessment</span><span class="px">19 / 1.75rem</span></div>
+        <div class="typerow"><span class="tag">base</span><span class="spec t-base">Body copy for forms and detail views.</span><span class="px">15 / 1.5rem</span></div>
+        <div class="typerow"><span class="tag">sm</span><span class="spec t-sm">Table cells and secondary labels.</span><span class="px">14 / 1.25rem</span></div>
+        <div class="typerow"><span class="tag">xs</span><span class="spec t-xs">Badges, captions, timestamps.</span><span class="px">13 / 1.25rem</span></div>
+      </div>
+    </section>
+
+    <!-- COMPONENTS -->
+    <section>
+      <p class="eyebrow">Components</p>
+      <h2 class="sec">Specimens</h2>
+      <p class="lede">The recurring vocabulary: <code class="tok">rounded-xl</code> controls/cards, <code class="tok">rounded-2xl</code> panels, pills for status, navy focus rings.</p>
+
+      <div class="grid cols-2" style="gap:22px">
+        <div class="panel">
+          <h3>Buttons</h3>
+          <div class="specimen">
+            <button class="btn btn-primary">Approve decision</button>
+            <button class="btn btn-gold">Escalate</button>
+            <button class="btn btn-blue">Save</button>
+            <button class="btn btn-ghost">Cancel</button>
+            <button class="btn btn-danger">Reject</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>Status badges</h3>
+          <div class="specimen">
+            <span class="badge b-navy">Pending</span>
+            <span class="badge b-success">Approved</span>
+            <span class="badge b-warning">Under review</span>
+            <span class="badge b-danger">Rejected</span>
+            <span class="badge b-primary">Escalated</span>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>Input — navy focus ring</h3>
+          <div class="field">
+            <label>Case reference</label>
+            <input class="input" placeholder="ICRCS-2026-000482" />
+          </div>
+          <p class="lede" style="margin:12px 0 0;font-size:13px">Focus: <code class="tok">ring-2 ring-icrcs-navy/20 border-icrcs-navy</code></p>
+        </div>
+
+        <div class="panel">
+          <h3>Sidebar — navy + gold accent bar</h3>
+          <div class="mini-nav">
+            <div class="top"></div>
+            <ul>
+              <li class="active">Dashboard</li>
+              <li>Status determination</li>
+              <li class="sub">Assessment</li>
+              <li>Adjudication</li>
+              <li>Reports</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:22px">
+        <h3 style="font-size:13px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;color:var(--ink-soft);margin:0 0 14px">Cards &amp; metrics</h3>
+        <div class="metrics">
+          <div class="demo-card">
+            <div class="rowtop"><div class="ico">▣</div><div><h4>Active cases</h4><div class="sub">This quarter</div></div></div>
+            <div class="stat">1,284</div>
+            <span class="badge b-success" style="margin-top:8px;display:inline-block">▲ 12%</span>
+          </div>
+          <div class="demo-card">
+            <div class="rowtop"><div class="ico">◷</div><div><h4>Awaiting review</h4><div class="sub">SLA &lt; 48h</div></div></div>
+            <div class="stat">96</div>
+            <span class="badge b-warning" style="margin-top:8px;display:inline-block">Attention</span>
+          </div>
+          <div class="demo-card">
+            <div class="rowtop"><div class="ico">✓</div><div><h4>Determined</h4><div class="sub">Last 30 days</div></div></div>
+            <div class="stat">742</div>
+            <span class="badge b-navy" style="margin-top:8px;display:inline-block">On track</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TOKENS DETAIL -->
+    <section>
+      <p class="eyebrow">Foundations</p>
+      <h2 class="sec">Radii, shadow &amp; motion</h2>
+      <div class="grid cols-3" style="gap:22px">
+        <div class="panel">
+          <h3>Radius</h3>
+          <div style="display:flex;gap:14px;align-items:flex-end">
+            <div style="text-align:center"><div style="height:56px;width:56px;background:var(--panel-2);border:1px solid var(--line);border-radius:12px"></div><div class="cls" style="font-family:var(--font-mono);font-size:11px;color:var(--ink-soft);margin-top:6px">xl · 12px</div></div>
+            <div style="text-align:center"><div style="height:56px;width:56px;background:var(--panel-2);border:1px solid var(--line);border-radius:16px"></div><div class="cls" style="font-family:var(--font-mono);font-size:11px;color:var(--ink-soft);margin-top:6px">2xl · 16px</div></div>
+            <div style="text-align:center"><div style="height:56px;width:56px;background:var(--panel-2);border:1px solid var(--line);border-radius:999px"></div><div class="cls" style="font-family:var(--font-mono);font-size:11px;color:var(--ink-soft);margin-top:6px">full</div></div>
+          </div>
+        </div>
+        <div class="panel">
+          <h3>Shadow</h3>
+          <div style="display:flex;gap:16px;padding:6px 2px 2px">
+            <div style="flex:1;height:64px;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-card);display:grid;place-items:center;font-family:var(--font-mono);font-size:11px;color:var(--ink-soft)">card</div>
+            <div style="flex:1;height:64px;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-card-hover);display:grid;place-items:center;font-family:var(--font-mono);font-size:11px;color:var(--ink-soft)">card-hover</div>
+          </div>
+        </div>
+        <div class="panel">
+          <h3>Motion</h3>
+          <div style="font-size:13.5px;color:var(--ink)">
+            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line)"><code class="tok">fade-in</code><span style="color:var(--ink-soft)">0.3s ease-out</span></div>
+            <div style="display:flex;justify-content:space-between;padding:6px 0"><code class="tok">slide-up</code><span style="color:var(--ink-soft)">0.4s · 12px rise</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="note">
+      <b>Single source of truth.</b> Tokens live in <code class="tok">src/theme/icrcs-theme.js</code> (Tailwind 3, imported into <code class="tok">tailwind.config.js</code>) and mirror to <code class="tok">src/theme/icrcs-theme.css</code> as an <code class="tok">@theme</code> block for Tailwind 4. Change a value in one, change it in the other — then class names resolve identically across every portal. Base styles and utilities (<code class="tok">.card-shadow</code>, <code class="tok">.animate-fade-in</code>, <code class="tok">.min-touch-target</code>) live in the global <code class="tok">index.css</code>.
+    </footer>
+
+  </div>
+</div>
+</body>
+</html>

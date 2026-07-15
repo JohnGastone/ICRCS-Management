@@ -1,0 +1,77 @@
+/* ============================================================================
+ * ICRCS Shared Design Tokens — Tailwind CSS 4 (@theme) edition
+ * ----------------------------------------------------------------------------
+ * Paste this block into the target app's globals.css, right after
+ *   @import "tailwindcss";
+ *
+ * Values are the canonical ICRCS palette and MUST stay in sync with
+ * icrcs-theme.js (the Tailwind 3 source).
+ *
+ * After pasting, class names resolve identically across portals, e.g.
+ *   bg-icrcs-navy  text-primary  border-border  bg-surface  text-muted
+ * ========================================================================== */
+
+@theme {
+  /* Brand / institutional palette */
+  --color-primary: #005BAC;
+  --color-primary-light: #0A6EC8;
+  --color-primary-dark: #004A8E;
+
+  --color-secondary: #0F766E;
+  --color-secondary-light: #16918A;
+
+  --color-accent: #F59E0B;
+  --color-accent-light: #FBBF24;
+
+  --color-icrcs-navy: #0B1D3A;
+  --color-icrcs-navy-light: #132743;
+  --color-icrcs-navy-dark: #060F1E;
+  --color-icrcs-gold: #D4AF37;
+  --color-icrcs-gold-light: #E8C84A;
+  --color-icrcs-cream: #F5F5F0;
+
+  /* Functional / state palette */
+  --color-success: #16A34A;
+  --color-success-light: #22C55E;
+  --color-warning: #D97706;
+  --color-warning-dark: #B45309;
+  --color-danger: #DC2626;
+
+  /* Surface / neutral tokens (layout vocabulary) */
+  --color-bg: #F8FAFC;
+  --color-surface: #FFFFFF;
+  --color-border: #E2E8F0;
+  --color-text: #1E293B;
+  --color-muted: #64748B;
+  --color-muted-light: #94A3B8;
+
+  /* Typography — standardize every portal on Inter */
+  --font-sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+
+  --text-xs: 13px;
+  --text-sm: 14px;
+  --text-base: 15px;
+  --text-lg: 19px;
+  --text-xl: 22px;
+  --text-2xl: 26px;
+
+  /* Shadows */
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-card-hover: 0 10px 25px -5px rgba(0, 0, 0, 0.08),
+    0 4px 10px -2px rgba(0, 0, 0, 0.04);
+
+  /* Motion */
+  --animate-fade-in: fadeIn 0.3s ease-out;
+  --animate-slide-up: slideUp 0.4s ease-out;
+}
+
+@keyframes fadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes slideUp {
+  0% { opacity: 0; transform: translateY(12px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
