@@ -17,6 +17,15 @@ import {
 // getQualityLabel below - NFIQ 1-3 accepted, 4-5 rejected.
 const MAX_ACCEPTABLE_NFIQ = 3;
 
+// Fingers that make up each physical placement group on the RealScan-G10. Shared
+// by capture and group-recapture so both operate on exactly the same set.
+const GROUP_FINGERS = {
+  left: [{ hand: 'left', name: 'index' }, { hand: 'left', name: 'middle' }, { hand: 'left', name: 'ring' }, { hand: 'left', name: 'pinky' }],
+  thumbs: [{ hand: 'thumbs', name: 'left' }, { hand: 'thumbs', name: 'right' }],
+  right: [{ hand: 'right', name: 'index' }, { hand: 'right', name: 'middle' }, { hand: 'right', name: 'ring' }, { hand: 'right', name: 'pinky' }],
+};
+const GROUP_LABELS = { left: 'Left Hand', thumbs: 'Thumbs', right: 'Right Hand' };
+
 const mockPortalApps = {
   'APP-2026-000145': {
     appNo: 'APP-2026-000145', appType: 'Status Determination', submissionDate: '12-Jun-2026', currentStatus: 'Submitted',
@@ -295,6 +304,31 @@ export default function Biometric() {
     setFpComments(c => ({ ...c, [hand]: { ...c[hand], [name]: '' } }));
     delete capturedArtifactsRef.current[hand][name];
   };
+  // Reset only one placement group (left hand / right hand / thumbs) back to
+  // pending, leaving every other group's captured prints untouched.
+  const recaptureGroup = (groupKey) => {
+    if (scanningFinger) return;
+    const fingers = GROUP_FINGERS[groupKey];
+    setFingerprints(fp => {
+      const next = { ...fp };
+      fingers.forEach(f => { next[f.hand] = { ...next[f.hand], [f.name]: 'pending' }; });
+      return next;
+    });
+    setFpQuality(q => {
+      const next = { ...q };
+      fingers.forEach(f => { next[f.hand] = { ...next[f.hand], [f.name]: 0 }; });
+      return next;
+    });
+    setFpComments(c => {
+      const next = { ...c };
+      fingers.forEach(f => { next[f.hand] = { ...next[f.hand], [f.name]: '' }; });
+      return next;
+    });
+    fingers.forEach(f => { delete capturedArtifactsRef.current[f.hand][f.name]; });
+    if (selectedFinger && fingers.some(f => f.hand === selectedFinger.hand && f.name === selectedFinger.name)) {
+      setSelectedFinger(null);
+    }
+  };
   const openCommentModal = (hand, name) => {
     const label = getFingerLabel(hand, name);
     setCommentModal({ open: true, hand, name, label, comment: fpComments[hand][name] || '' });
@@ -311,12 +345,7 @@ export default function Biometric() {
   // until it's terminal, then fan the per-finger results back into the UI state.
   const captureGroup = async (groupKey) => {
     if (scanningFinger) return;
-    const groupMap = {
-      left: [{ hand: 'left', name: 'index' }, { hand: 'left', name: 'middle' }, { hand: 'left', name: 'ring' }, { hand: 'left', name: 'pinky' }],
-      thumbs: [{ hand: 'thumbs', name: 'left' }, { hand: 'thumbs', name: 'right' }],
-      right: [{ hand: 'right', name: 'index' }, { hand: 'right', name: 'middle' }, { hand: 'right', name: 'ring' }, { hand: 'right', name: 'pinky' }],
-    };
-    const fingers = groupMap[groupKey];
+    const fingers = GROUP_FINGERS[groupKey];
     const pending = fingers.filter(f => fingerprints[f.hand][f.name] === 'pending');
     if (pending.length === 0) return;
 
@@ -1542,6 +1571,15 @@ export default function Biometric() {
                     </g>
                   </svg>
                 );
+                // Renders the actual black-and-white fingerprint image returned by
+                // the scanner. Falls back to the ridge illustration only if the raw
+                // image is missing (older capture / device without image payload).
+                const FpImage = ({ hand, name, className = 'w-full h-full object-contain' }) => {
+                  const raw = capturedArtifactsRef.current?.[hand]?.[name]?.rawImage;
+                  if (!raw) return <FingerPrintSVG color="#10b981" opacity={0.5} />;
+                  const src = raw.startsWith('data:') ? raw : `data:image/png;base64,${raw}`;
+                  return <img src={src} alt={getFingerLabel(hand, name)} className={className} />;
+                };
                 const GroupResultRow = ({ hand, name, label }) => {
                   const status = fingerprints[hand][name];
                   const quality = fpQuality[hand][name];
@@ -1582,14 +1620,17 @@ export default function Biometric() {
                   else if (anyCapturing) previewStatus = 'capturing';
                   else if (allException) previewStatus = 'exception';
                   else if (anyFailed) previewStatus = 'failed';
-                  const previewColor = previewStatus === 'captured' ? '#10b981' : previewStatus === 'failed' ? '#ef4444' : previewStatus === 'exception' ? '#f59e0b' : '#94a3b8';
                   const canCapture = anyPending && !scanningFinger;
                   return (
                     <div className="flex flex-col items-center gap-1.5">
                       <button onClick={() => canCapture && captureGroup(groupKey)} disabled={!canCapture} className={`h-[140px] w-[140px] rounded-2xl border-2 flex items-center justify-center overflow-hidden transition-all ${previewStatus === 'captured' ? 'border-green-300 bg-green-50' : previewStatus === 'capturing' ? 'border-sky-400 bg-sky-50 animate-pulse' : previewStatus === 'failed' ? 'border-red-300 bg-red-50' : previewStatus === 'exception' ? 'border-amber-300 bg-amber-50' : canCapture ? 'border-gray-300 bg-gray-50 hover:border-icrcs-navy hover:bg-blue-50/30 cursor-pointer' : 'border-gray-200 bg-gray-50'} disabled:opacity-60 disabled:cursor-not-allowed`}>
                         {previewStatus === 'captured' && (
-                          <div className="w-full h-full p-2 flex items-center justify-center">
-                            <FingerPrintSVG color={previewColor} opacity={0.5} />
+                          <div className={`w-full h-full p-1.5 grid gap-1 bg-white ${fingers.length === 2 ? 'grid-cols-2' : 'grid-cols-2 grid-rows-2'}`}>
+                            {fingers.map(f => (
+                              <div key={f.name} className="rounded overflow-hidden bg-white flex items-center justify-center">
+                                <FpImage hand={f.hand} name={f.name} className="w-full h-full object-cover" />
+                              </div>
+                            ))}
                           </div>
                         )}
                         {previewStatus === 'pending' && (
@@ -1629,7 +1670,7 @@ export default function Biometric() {
                       <div className={`w-full flex-1 rounded-lg flex items-center justify-center ${status === 'captured' ? 'bg-green-50' : status === 'capturing' ? 'bg-sky-50' : status === 'failed' ? 'bg-red-50' : status === 'exception' ? 'bg-amber-50' : 'bg-gray-50'}`}>
                         {status === 'pending' && <Fingerprint className="h-8 w-8 text-gray-300" />}
                         {status === 'capturing' && <Loader2 className="h-8 w-8 text-sky-500 animate-spin" />}
-                        {status === 'captured' && <div className="w-full h-full p-1"><FingerPrintSVG color="#10b981" opacity={0.5} /></div>}
+                        {status === 'captured' && <div className="w-full h-full p-1 bg-white rounded-lg overflow-hidden"><FpImage hand={hand} name={name} /></div>}
                         {status === 'failed' && <X className="h-8 w-8 text-red-400" strokeWidth={2.5} />}
                         {status === 'exception' && <AlertTriangle className="h-8 w-8 text-amber-400" />}
                       </div>
@@ -1749,8 +1790,22 @@ export default function Biometric() {
                         {selectedFinger && selStatus !== 'exception' && (
                           <button onClick={() => openCommentModal(selectedFinger.hand, selectedFinger.name)} disabled={scanningFinger} className="px-4 py-2 rounded-xl border border-amber-200 text-xs font-medium text-amber-700 hover:bg-amber-50 transition-colors flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"><AlertTriangle className="h-3 w-3" /> Mark Exception</button>
                         )}
-                        <button onClick={() => { setFingerprints({ left: { index: 'pending', middle: 'pending', ring: 'pending', pinky: 'pending' }, right: { index: 'pending', middle: 'pending', ring: 'pending', pinky: 'pending' }, thumbs: { left: 'pending', right: 'pending' } }); setFpQuality({ left: { index: 0, middle: 0, ring: 0, pinky: 0 }, right: { index: 0, middle: 0, ring: 0, pinky: 0 }, thumbs: { left: 0, right: 0 } }); setFpComments({ left: { index: '', middle: '', ring: '', pinky: '' }, right: { index: '', middle: '', ring: '', pinky: '' }, thumbs: { left: '', right: '' } }); setSelectedFinger(null); }} disabled={scanningFinger} className="px-4 py-2 rounded-xl border border-gray-200 text-xs font-medium text-gray-500 hover:bg-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed">Recapture All</button>
+                        <button onClick={() => { setFingerprints({ left: { index: 'pending', middle: 'pending', ring: 'pending', pinky: 'pending' }, right: { index: 'pending', middle: 'pending', ring: 'pending', pinky: 'pending' }, thumbs: { left: 'pending', right: 'pending' } }); setFpQuality({ left: { index: 0, middle: 0, ring: 0, pinky: 0 }, right: { index: 0, middle: 0, ring: 0, pinky: 0 }, thumbs: { left: 0, right: 0 } }); setFpComments({ left: { index: '', middle: '', ring: '', pinky: '' }, right: { index: '', middle: '', ring: '', pinky: '' }, thumbs: { left: '', right: '' } }); capturedArtifactsRef.current = { left: {}, right: {}, thumbs: {} }; setSelectedFinger(null); }} disabled={scanningFinger} className="px-4 py-2 rounded-xl border border-gray-200 text-xs font-medium text-gray-500 hover:bg-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed">Recapture All</button>
                       </div>
+                      {/* Per-group recapture — resets only the chosen placement, keeping other captured groups intact */}
+                      {(['left', 'thumbs', 'right']).some(g => GROUP_FINGERS[g].some(f => fingerprints[f.hand][f.name] !== 'pending')) && (
+                        <div className="flex flex-wrap items-center gap-2 pt-1">
+                          <span className="text-xs font-medium text-gray-400">Recapture group:</span>
+                          {(['left', 'thumbs', 'right']).map(g => {
+                            const hasCaptured = GROUP_FINGERS[g].some(f => fingerprints[f.hand][f.name] !== 'pending');
+                            return (
+                              <button key={g} onClick={() => recaptureGroup(g)} disabled={scanningFinger || !hasCaptured} className="px-3 py-1.5 rounded-xl border border-gray-200 text-xs font-medium text-gray-600 hover:bg-white transition-colors flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed">
+                                <RefreshCw className="h-3 w-3" /> {GROUP_LABELS[g]}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
 
                     {canProceedFromStep2() && (
