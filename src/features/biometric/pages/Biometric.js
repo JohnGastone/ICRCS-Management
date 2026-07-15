@@ -11,11 +11,11 @@ import {
   GROUP_KEY_TO_DEVICE,
 } from '../../../services/deviceService';
 
-// Minimum scanner qualityScore to accept a finger. RSWAS/UFExtractor returns an
-// NFIQ-style 0-100 score (higher is better); 60 is the "Acceptable" floor used by
-// getQualityLabel below. Adjust here if real-hardware testing shows a different
-// scale. (See icrcs-device-service README - the scale is unverified vs hardware.)
-const MIN_ACCEPTABLE_QUALITY = 60;
+// Maximum scanner qualityScore to accept a finger. Confirmed on real RealScan-G10
+// hardware: RSWAS/UFExtractor returns the legacy NFIQ scale (1 = best, 5 = worst),
+// NOT a 0-100 score where higher is better. 3 is the "Acceptable" ceiling used by
+// getQualityLabel below - NFIQ 1-3 accepted, 4-5 rejected.
+const MAX_ACCEPTABLE_NFIQ = 3;
 
 const mockPortalApps = {
   'APP-2026-000145': {
@@ -276,9 +276,10 @@ export default function Biometric() {
     const fingerName = name === 'index' ? 'Index' : name === 'middle' ? 'Middle' : name === 'ring' ? 'Ring' : name === 'pinky' ? 'Little' : 'Thumb';
     return `${handLabel} ${fingerName}`;
   };
+  // NFIQ scale: 1 = best, 5 = worst.
   const getQualityLabel = (q) => {
-    if (q >= 80) return { label: 'Excellent', badgeClass: 'bg-icrcs-gold/10 text-icrcs-gold border-icrcs-gold/30' };
-    if (q >= 60) return { label: 'Acceptable', badgeClass: 'bg-sky-50 text-sky-700 border-sky-200' };
+    if (q <= 2) return { label: 'Excellent', badgeClass: 'bg-icrcs-gold/10 text-icrcs-gold border-icrcs-gold/30' };
+    if (q <= 3) return { label: 'Acceptable', badgeClass: 'bg-sky-50 text-sky-700 border-sky-200' };
     return { label: 'Poor', badgeClass: 'bg-red-50 text-red-600 border-red-200' };
   };
   const setGroupStatus = (fingers, status) => {
@@ -336,7 +337,7 @@ export default function Biometric() {
         if (!slot) return; // ignore composite/slap entries the device may also return
         seen.add(`${slot.hand}.${slot.name}`);
         const quality = Math.round(result.qualityScore);
-        const finalStatus = quality >= MIN_ACCEPTABLE_QUALITY ? 'captured' : 'failed';
+        const finalStatus = quality <= MAX_ACCEPTABLE_NFIQ ? 'captured' : 'failed';
         capturedArtifactsRef.current[slot.hand][slot.name] = { rawImage: result.rawImage, template: result.template, quality };
         setFingerprints(fp => ({ ...fp, [slot.hand]: { ...fp[slot.hand], [slot.name]: finalStatus } }));
         setFpQuality(q => ({ ...q, [slot.hand]: { ...q[slot.hand], [slot.name]: quality } }));
@@ -380,7 +381,7 @@ export default function Biometric() {
         return;
       }
       const quality = Math.round(result.qualityScore);
-      const finalStatus = quality >= MIN_ACCEPTABLE_QUALITY ? 'captured' : 'failed';
+      const finalStatus = quality <= MAX_ACCEPTABLE_NFIQ ? 'captured' : 'failed';
       capturedArtifactsRef.current[hand][name] = { rawImage: result.rawImage, template: result.template, quality };
       setFingerprints(fp => ({ ...fp, [hand]: { ...fp[hand], [name]: finalStatus } }));
       setFpQuality(q => ({ ...q, [hand]: { ...q[hand], [name]: quality } }));
@@ -427,7 +428,7 @@ export default function Biometric() {
         <p className="text-xs font-bold text-gray-600 uppercase tracking-wide">{label}</p>
         <p className={`text-xs font-medium ${statusColor}`}>{statusText}</p>
         {status === 'captured' && quality > 0 && (
-          <span className={`text-xs px-1.5 py-0.5 rounded-full border font-semibold ${qInfo.badgeClass}`}>{quality}% — {qInfo.label}</span>
+          <span className={`text-xs px-1.5 py-0.5 rounded-full border font-semibold ${qInfo.badgeClass}`}>NFIQ {quality} — {qInfo.label}</span>
         )}
       </button>
     );
@@ -1551,7 +1552,7 @@ export default function Biometric() {
                       <div className="flex items-center gap-2">
                         <span className={`text-sm ${status === 'captured' ? 'text-green-600' : status === 'failed' ? 'text-red-500' : status === 'exception' ? 'text-amber-600' : 'text-gray-400'}`}>{label}</span>
                         {status === 'captured' && quality > 0 && (
-                          <span className={`text-xs px-1 py-0.5 rounded-full border font-bold ${qInfo.badgeClass}`}>{quality}% {qInfo.label}</span>
+                          <span className={`text-xs px-1 py-0.5 rounded-full border font-bold ${qInfo.badgeClass}`}>NFIQ {quality} {qInfo.label}</span>
                         )}
                       </div>
                       <div className="flex items-center gap-1">
