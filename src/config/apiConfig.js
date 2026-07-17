@@ -1,5 +1,6 @@
 // Management service — handles case queues, assessment, approval
-export const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8081/v1';
+// Context path /api is set in icrcs-management application.properties
+export const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8081/api/v1';
 
 // ICRCS-API — handles officer authentication (login proxy → User Management API)
 export const AUTH_BASE_URL = process.env.REACT_APP_AUTH_URL || 'http://localhost:8080/v1';
