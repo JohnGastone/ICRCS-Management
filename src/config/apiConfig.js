@@ -1,9 +1,6 @@
-// Management service — handles case queues, assessment, approval
-// Context path /api is set in icrcs-management application.properties
+// Management service — context path /api set in icrcs-management application.properties
+// Handles both officer auth (/v1/auth) and case management (/v1/management)
 export const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8081/api/v1';
-
-// ICRCS-API — handles officer authentication (login proxy → User Management API)
-export const AUTH_BASE_URL = process.env.REACT_APP_AUTH_URL || 'http://localhost:8080/v1';
 
 // Local office agent that drives the fingerprint scanner (icrcs-device-service).
 // A different origin from API_BASE_URL - it must NOT receive this app's auth token.

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import { AUTH_BASE_URL, ROLE_MAP } from '../../config/apiConfig';
+import { API_BASE_URL, ROLE_MAP } from '../../config/apiConfig';
 
 const AuthContext = createContext(null);
 
@@ -23,7 +23,7 @@ export function AuthProvider({ children }) {
     setAuthLoading(true);
     setAuthError(null);
     try {
-      const res  = await fetch(`${AUTH_BASE_URL}/auth/login`, {
+      const res  = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: email, password }),
