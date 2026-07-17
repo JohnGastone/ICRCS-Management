@@ -1,4 +1,8 @@
+// Management service — handles case queues, assessment, approval
 export const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8081/v1';
+
+// ICRCS-API — handles officer authentication (login proxy → User Management API)
+export const AUTH_BASE_URL = process.env.REACT_APP_AUTH_URL || 'http://localhost:8080/v1';
 
 // Local office agent that drives the fingerprint scanner (icrcs-device-service).
 // A different origin from API_BASE_URL - it must NOT receive this app's auth token.
