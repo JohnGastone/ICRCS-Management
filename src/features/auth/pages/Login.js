@@ -7,26 +7,25 @@ import uhamiajiLogo from '../../../assets/images/uhamiaji.png';
 
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
-  const [role, setRole] = useState('assessor');
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     if (!form.email || !form.password) { setError('Please fill in all fields'); return; }
-    const names = {
-      registration_officer: 'Juma Kipanya',
-      assessor: 'Grace Temu',
-      approver: 'Dr. Ramadhani',
-      etd_officer: 'Asha Mohamed',
-      admin: 'Admin User',
-      management: 'Director Msuya'
-    };
-    login({ email: form.email, name: names[role] || 'User', role });
-    navigate('/internal/dashboard');
+    setLoading(true);
+    try {
+      await login(form.email, form.password);
+      navigate('/internal/dashboard');
+    } catch (err) {
+      setError(err.message || 'Login failed. Please check your credentials.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -168,28 +167,13 @@ export default function Login() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wide mb-1.5">Sign in as</label>
-                <select
-                  value={role}
-                  onChange={(e) => setRole(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50/50 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-icrcs-navy/20 focus:border-icrcs-navy transition-all"
-                >
-                  <option value="registration_officer">Registration Officer</option>
-                  <option value="assessor">Assessor</option>
-                  <option value="approver">Approver</option>
-                  <option value="etd_officer">ETD Officer</option>
-                  <option value="admin">System Administrator</option>
-                  <option value="management">Immigration Management</option>
-                </select>
-              </div>
-
               <button
                 type="submit"
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-icrcs-navy text-white font-semibold hover:bg-icrcs-navy-light transition-all shadow-md"
+                disabled={loading}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-icrcs-navy text-white font-semibold hover:bg-icrcs-navy-light transition-all shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <LogIn className="h-4 w-4" />
-                <span>Sign In</span>
+                <span>{loading ? 'Signing in…' : 'Sign In'}</span>
               </button>
             </form>
 

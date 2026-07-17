@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { getEnrollmentQueue, getCaseBySubject, enrollCase } from '../../../services/managementService';
 import { Search, Globe, AlertCircle, Loader2, Eye, Camera, CheckCircle, X, XCircle, Fingerprint, ChevronDown, Filter, FileCheck, SendHorizontal, StickyNote, Upload, Pen, RefreshCw, AlertTriangle, Sun, Image, User, FolderOpen, ClipboardList, MessageSquare, ArrowLeft, Download, FileText, Clock, ArrowUpDown } from 'lucide-react';
 import ApplicantInfoView from '../../../components/common/ApplicantInfoView';
 import { buildApplicant } from '../../../data/mockApplicantData';
@@ -96,7 +97,31 @@ export default function Biometric() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [fetchedApp, setFetchedApp] = useState(null);
-  const [queue, setQueue] = useState(initialQueue);
+  const [queue, setQueue] = useState([]);
+  const [loadingQueue, setLoadingQueue] = useState(true);
+
+  const loadQueue = useCallback(async () => {
+    setLoadingQueue(true);
+    try {
+      const data = await getEnrollmentQueue({ page: 0, size: 100 });
+      const items = (data?.items || []).map(c => ({
+        caseNo: c.caseNo,
+        appNo: c.subjectId,
+        fullName: c.fullName,
+        nationality: c.nationalityCode,
+        status: 'Pending Biometric Capture',
+        officer: c.assignedOfficerName || '',
+        dateReceived: c.assignedDate || c.createdAt,
+      }));
+      setQueue(items);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoadingQueue(false);
+    }
+  }, []);
+
+  useEffect(() => { loadQueue(); }, [loadQueue]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [showReviewModal, setShowReviewModal] = useState(false);
@@ -165,27 +190,37 @@ export default function Biometric() {
 
   const clearSuccess = () => setSuccessMsg('');
 
-  const handleSearch = (e) => {
+  const handleSearch = async (e) => {
     e.preventDefault();
     setError('');
     setFetchedApp(null);
     clearSuccess();
-    if (!appNumber.trim()) { setError('Please enter the Application Number.'); return; }
+    if (!appNumber.trim()) { setError('Please enter the Subject ID.'); return; }
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      const data = mockPortalApps[appNumber.trim()];
-      if (!data) {
-        setError('No application was found using the supplied Application Number.');
-      } else if (queue.some(q => q.appNo === data.appNo)) {
-        setError('This application has already been received into the Management Portal.');
-      } else {
-        setFetchedApp(data);
-        setReviewRemarks('');
-        setReleaseRemarksError('');
-        setShowReviewModal(true);
+    try {
+      const c = await getCaseBySubject(appNumber.trim());
+      if (!c) { setError('No case found for that Subject ID.'); return; }
+      if (queue.some(q => q.appNo === c.subjectId || q.caseNo === c.caseNo)) {
+        setError('This case is already in the enrollment queue.');
+        return;
       }
-    }, 600);
+      setFetchedApp({
+        appNo: c.subjectId,
+        caseNo: c.caseNo,
+        appType: c.registrationType,
+        fullName: c.person?.fullName || c.subjectId,
+        nationality: c.person?.nationalityCode,
+        dob: c.person?.dateOfBirth,
+        currentStatus: c.status,
+      });
+      setReviewRemarks('');
+      setReleaseRemarksError('');
+      setShowReviewModal(true);
+    } catch (err) {
+      setError(err.message || 'No case found for that Subject ID.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const closeReviewModal = () => { setShowReviewModal(false); setFetchedApp(null); setReviewRemarks(''); setReleaseRemarksError(''); setActiveReviewTab('info'); setPreviewDoc(null); };
@@ -744,11 +779,16 @@ export default function Biometric() {
 
   const confirmForward = (row) => { setForwardTarget(row); setForwardCheck(false); setForwardComment(''); setShowForwardConfirm(true); };
   const cancelForward = () => { setShowForwardConfirm(false); setForwardTarget(null); setForwardCheck(false); setForwardComment(''); };
-  const doForward = () => {
+  const doForward = async () => {
     if (!forwardTarget || !forwardCheck) return;
-    setQueue(prev => prev.map(q => q.caseNo === forwardTarget.caseNo ? { ...q, status: 'Forwarded to Assessment', forwardComment: forwardComment.trim() || null } : q));
-    setSuccessMsg('Application successfully forwarded to Assessments.');
-    setTimeout(clearSuccess, 4000);
+    try {
+      await enrollCase(forwardTarget.caseNo);
+      setQueue(prev => prev.filter(q => q.caseNo !== forwardTarget.caseNo));
+      setSuccessMsg('Application forwarded to Assessment queue.');
+      setTimeout(clearSuccess, 4000);
+    } catch (err) {
+      setError(err.message);
+    }
     cancelForward();
   };
 

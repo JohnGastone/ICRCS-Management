@@ -68,6 +68,7 @@ export default function ApproveDecisionWorkspace({row,isOpen,onClose,onSubmit}){
   const[notes,setNotes]=useState('');
   const[decision,setDecision]=useState('');
   const[finalStatus,setFinalStatus]=useState('');
+  const[documentType,setDocumentType]=useState('');
   const[reason,setReason]=useState('');
   const[escalationDept,setEscalationDept]=useState('');
   const[docFields,setDocFields]=useState([]);
@@ -125,8 +126,13 @@ export default function ApproveDecisionWorkspace({row,isOpen,onClose,onSubmit}){
     if(decision==='escalate'&&!escalationDept){setToast('Select a department.');setTimeout(()=>setToast(''),4000);return;}
     if((decision==='reject'||decision==='return'||decision==='escalate')&&!reason.trim()){setToast('Enter a reason.');setTimeout(()=>setToast(''),4000);return;}
     if(decision==='approve'&&!finalStatus){setToast('Select a final immigration status.');setTimeout(()=>setToast(''),4000);return;}
-    const ns=decision==='approve'?'Approved':decision==='reject'?'Rejected':decision==='return'?'Returned to Assessment':'Escalated to Department';
-    onSubmit(row.caseNo,ns);
+    onSubmit(row.caseNo,{
+      decision:decision==='return'?'RETURN_TO_ASSESSMENT':decision.toUpperCase(),
+      finalStatus:decision==='approve'?finalStatus:undefined,
+      documentType:decision==='approve'&&finalStatus==='LEGAL_MIGRANT'?documentType:undefined,
+      reason:(decision==='reject'||decision==='return'||decision==='escalate')?reason:undefined,
+      notes:notes||undefined,
+    });
     setConfirm(false);onClose();
   };
 

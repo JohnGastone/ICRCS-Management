@@ -3,11 +3,14 @@ import {
   Search, Fingerprint, User, Calendar, BadgeCheck, SearchIcon,
   Mail, Phone, MapPin, ChevronRight, MessageSquare, X, FileText, ClipboardCheck, Check, Minus
 } from 'lucide-react';
+import { getCaseBySubject } from '../../../services/managementService';
 
 export default function Enquiries() {
   const [searchType, setSearchType] = useState('subject_id');
   const [query, setQuery] = useState('');
   const [result, setResult] = useState(null);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState('');
   const [activeSection, setActiveSection] = useState('overview');
   const [docModalOpen, setDocModalOpen] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState(null);
@@ -75,9 +78,39 @@ export default function Enquiries() {
     }
   };
 
-  const handleSearch = (e) => {
+  const handleSearch = async (e) => {
     e.preventDefault();
-    if (query.trim()) setResult(mockResult);
+    if (!query.trim()) return;
+    setSearchError('');
+    setResult(null);
+
+    if (searchType === 'subject_id') {
+      setSearching(true);
+      try {
+        const c = await getCaseBySubject(query.trim());
+        setResult({
+          subjectId: c.subjectId,
+          name: c.person?.fullName || c.subjectId,
+          dob: c.person?.dateOfBirth,
+          nationality: c.person?.nationalityCode,
+          gender: c.person?.sexId === 1 ? 'Male' : 'Female',
+          status: c.status,
+          finalStatus: c.finalStatus,
+          documentType: c.documentType,
+          caseRef: c.caseNo,
+          registrationType: c.registrationType,
+          assessment: c.assessment,
+          decision: c.decision,
+        });
+      } catch (err) {
+        setSearchError(err.message || 'No case found for that Subject ID.');
+      } finally {
+        setSearching(false);
+      }
+    } else {
+      // Other search types (name, fingerprint, NIN, passport) not yet connected to API
+      setSearchError('Only Subject ID lookup is currently supported via this portal.');
+    }
   };
 
   const sectionTabs = [
@@ -140,10 +173,11 @@ export default function Enquiries() {
                   className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-icrcs-navy/20 focus:border-icrcs-navy transition-all"
                 />
               </div>
-              <button type="submit" className="px-6 py-2.5 rounded-xl bg-icrcs-navy text-white text-sm font-semibold hover:bg-icrcs-navy/90 transition-colors shadow-sm flex items-center justify-center gap-2 shrink-0">
-                <SearchIcon className="h-4 w-4" /> Search Records
+              <button type="submit" disabled={searching} className="px-6 py-2.5 rounded-xl bg-icrcs-navy text-white text-sm font-semibold hover:bg-icrcs-navy/90 transition-colors shadow-sm flex items-center justify-center gap-2 shrink-0 disabled:opacity-60">
+                <SearchIcon className="h-4 w-4" /> {searching ? 'Searching…' : 'Search Records'}
               </button>
             </div>
+            {searchError && <p className="mt-3 text-xs text-red-600 font-medium">{searchError}</p>}
           </form>
         </div>
       </div>

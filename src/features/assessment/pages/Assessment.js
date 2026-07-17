@@ -1,6 +1,7 @@
-import React,{useState}from'react';
+import React,{useState,useEffect,useCallback}from'react';
 import{ClipboardCheck,CheckCircle,XCircle,AlertTriangle,ClipboardList,Search,ChevronDown,ArrowUpDown,FolderOpen,RotateCcw,X}from'lucide-react';
 import AssessmentWorkspace from'../components/AssessmentWorkspace';
+import{getAssessmentQueue,assessCase}from'../../../services/managementService';
 
 const mockAssessments=[
 {caseNo:'ICRCS-ASM-2026-000120',appNo:'APP-2026-000145',fullName:'John Michael Doe',nationality:'Kenyan',gender:'Male',dob:'10-Jan-1990',passportNo:'A12345678',status:'Under Assessment',priority:'High',assignedDate:'12-Jun-2026',officer:'Grace Temu',documents:['passport_copy.pdf','birth_cert.jpg']},
@@ -21,7 +22,9 @@ const statusBadge=s=>{const m={'Pending Assessment':'bg-sky-50 text-sky-700 bord
 const priorityBadge=p=>{const m={'High':'bg-red-50 text-red-700 border-red-200','Medium':'bg-amber-50 text-amber-700 border-amber-200','Low':'bg-green-50 text-green-700 border-green-200'};return m[p]||'bg-gray-50 text-gray-600 border-gray-200'};
 
 export default function Assessment(){
-const[assessments,setAssessments]=useState(mockAssessments);
+const[assessments,setAssessments]=useState([]);
+const[loadingQueue,setLoadingQueue]=useState(true);
+const[queueError,setQueueError]=useState('');
 const[search,setSearch]=useState('');
 const[statusFilter,setStatusFilter]=useState('All');
 const[priorityFilter,setPriorityFilter]=useState('All');
@@ -32,6 +35,30 @@ const[sortDir,setSortDir]=useState('desc');
 const[successMsg,setSuccessMsg]=useState('');
 const[workspaceOpen,setWorkspaceOpen]=useState(false);
 const[workspaceRow,setWorkspaceRow]=useState(null);
+
+const loadQueue=useCallback(async()=>{
+  setLoadingQueue(true);setQueueError('');
+  try{
+    const data=await getAssessmentQueue({page:0,size:100});
+    const items=(data?.items||[]).map(c=>({
+      caseNo:c.caseNo,
+      appNo:c.subjectId,
+      fullName:c.fullName,
+      nationality:c.nationalityCode,
+      gender:c.sexId===1?'Male':'Female',
+      dob:c.dateOfBirth,
+      status:c.status,
+      priority:c.priority,
+      assignedDate:c.assignedDate,
+      officer:c.assignedOfficerName||'',
+      registrationType:c.registrationType,
+    }));
+    setAssessments(items);
+  }catch(e){setQueueError(e.message);}
+  finally{setLoadingQueue(false);}
+},[]);
+
+useEffect(()=>{loadQueue();},[loadQueue]);
 const rowsPerPageOptions=[5,20,50,100];
 
 const filtered=assessments.filter(a=>{
@@ -56,7 +83,13 @@ const goToPage=p=>setCurrentPage(Math.max(1,Math.min(p,totalPages)));
 
 const openWorkspace=row=>{setWorkspaceRow(row);setWorkspaceOpen(true);};
 const closeWorkspace=()=>{setWorkspaceOpen(false);setWorkspaceRow(null);};
-const handleSubmit=(caseNo,newStatus)=>{setAssessments(p=>p.map(a=>a.caseNo===caseNo?{...a,status:newStatus}:a));setSuccessMsg(`Case ${caseNo} updated to ${newStatus}.`);setTimeout(()=>setSuccessMsg(''),5000);};
+const handleSubmit=async(caseNo,formData)=>{
+  try{
+    await assessCase(caseNo,formData);
+    setSuccessMsg(`Case ${caseNo} assessment submitted.`);setTimeout(()=>setSuccessMsg(''),5000);
+    loadQueue();
+  }catch(e){setSuccessMsg('');setQueueError(e.message);}
+};
 
 const kpis=[
 {label:'Total Assigned',value:assessments.length,color:'bg-icrcs-navy',icon:ClipboardList},
@@ -72,6 +105,7 @@ return(
   <div><h1 className="text-2xl font-bold text-gray-900">Assessments</h1><p className="text-sm text-gray-500 mt-1">Review cases, conduct assessments, and submit recommendations</p></div>
  </div>
 
+ {queueError&&<div className="p-3 rounded-xl bg-red-50 border border-red-100 flex items-center gap-2"><XCircle className="h-4 w-4 text-red-600 shrink-0"/><span className="text-xs font-medium text-red-700">{queueError}</span><button onClick={()=>setQueueError('')} className="ml-auto"><X className="h-3.5 w-3.5 text-red-600"/></button></div>}
  {successMsg&&<div className="p-3 rounded-xl bg-green-50 border border-green-100 flex items-center gap-2"><CheckCircle className="h-4 w-4 text-green-600 shrink-0" strokeWidth={2.5}/><span className="text-xs font-medium text-green-700">{successMsg}</span><button onClick={()=>setSuccessMsg('')} className="ml-auto"><X className="h-3.5 w-3.5 text-green-600"/></button></div>}
 
  <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">

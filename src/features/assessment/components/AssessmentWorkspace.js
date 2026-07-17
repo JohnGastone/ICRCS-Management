@@ -112,8 +112,17 @@ export default function AssessmentWorkspace({row,isOpen,onClose,onSubmit}){
     if(recommendation==='approve'&&!finalStatus){setToast('Select a recommended immigration status.');setTimeout(()=>setToast(''),4000);return;}
     if((recommendation==='reject'||recommendation==='escalate')&&!reason.trim()){setToast('Enter a reason.');setTimeout(()=>setToast(''),4000);return;}
     if(recommendation==='escalate'&&!escalateTo.trim()){setToast('Select an escalation department.');setTimeout(()=>setToast(''),4000);return;}
-    const ns=recommendation==='approve'?'Completed':recommendation==='reject'?'Rejected':'Escalated';
-    onSubmit(row.caseNo,ns,reason,notes,escalateTo);setConfirm(false);onClose();
+    const checkedIndices=checks.map((v,i)=>v?i:-1).filter(i=>i>=0);
+    onSubmit(row.caseNo,{
+      checklist:checkedIndices,
+      findings,
+      notes,
+      recommendation:recommendation.toUpperCase(),
+      proposedFinalStatus:recommendation==='approve'?finalStatus:undefined,
+      reason:(recommendation==='reject'||recommendation==='escalate')?reason:undefined,
+      escalateToDepartment:recommendation==='escalate'?escalateTo:undefined,
+    });
+    setConfirm(false);onClose();
   };
 
   const applicant=buildApplicant(row);
