@@ -1,0 +1,15 @@
+# NOTE: node_modules is intentionally NOT ignored — the image build reuses the
+# locally installed modules (offline build; see Dockerfile).
+.git
+.gitignore
+build
+.env.example
+Dockerfile
+.dockerignore
+docker-compose.yml
+docker-compose.prod.yml
+README.md
+npm-debug.log*
+*.log
+.vscode
+.idea

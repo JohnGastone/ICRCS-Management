@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import { API_BASE_URL, ROLE_MAP } from '../../config/apiConfig';
+import { API_BASE_URL, API_ENDPOINTS, ROLE_MAP } from '../../config/apiConfig';
 
 const AuthContext = createContext(null);
 
@@ -66,6 +66,20 @@ export function AuthProvider({ children }) {
   }, []);
 
   const logout = useCallback(() => {
+    const token        = localStorage.getItem('officer_token');
+    const refreshToken = localStorage.getItem('officer_refresh_token');
+    // Best-effort server-side session invalidation. Fire-and-forget so local
+    // sign-out (below) is instant and never blocks on the network.
+    if (token || refreshToken) {
+      fetch(`${API_BASE_URL}${API_ENDPOINTS.AUTH.LOGOUT}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ refresh_token: refreshToken || '' }),
+      }).catch(() => {}); // ignore network/abort; local session is cleared regardless
+    }
     setUser(null);
     localStorage.removeItem('icrcs_user');
     localStorage.removeItem('officer_token');

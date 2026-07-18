@@ -1,0 +1,19 @@
+# Server deployment — pulls the pre-built image from the registry (no build).
+# Run on the server with:
+#   docker compose -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# Override the tag with:
+#   IMAGE_TAG=v1.0.1 docker compose -f docker-compose.prod.yml up -d
+#
+# The image is a self-contained nginx runtime: the CRA bundle (REACT_APP_API_URL
+# =/api/v1) and the backend proxy target (10.232.0.12:3231) are both baked in at
+# build time, so no runtime env file is required.
+services:
+  web:
+    container_name: icrcs-mgmt-portal
+    image: 10.248.0.5:30016/icrcs-mgmt-portal:${IMAGE_TAG:-v1.0.0}
+    pull_policy: always
+    ports:
+      - "6060:6060"
+    restart: unless-stopped

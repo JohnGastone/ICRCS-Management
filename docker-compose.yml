@@ -1,0 +1,17 @@
+# Local build + run for the ICRCS Management portal.
+#   docker compose up -d --build        # builds icrcs-mgmt-portal
+#   docker tag  icrcs-mgmt-portal:v1.0.0 10.248.0.5:30016/icrcs-mgmt-portal:v1.0.0
+#   docker push 10.248.0.5:30016/icrcs-mgmt-portal:v1.0.0
+#
+# REACT_APP_* and the nginx backend proxy target are baked into the image at
+# build time, so no runtime env is needed here.
+services:
+  web:
+    container_name: icrcs-mgmt-portal
+    image: 10.248.0.5:30016/icrcs-mgmt-portal:v1.0.0
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "6060:6060"
+    restart: unless-stopped
