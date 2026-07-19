@@ -30,6 +30,11 @@ export async function getApprovalQueue({ page = 0, size = 20, search, status, pr
 
 // ── Case detail & lookup ────────────────────────────────────────────────────
 
+export async function getApplicantReview(caseNo) {
+  const res = await apiClient(API_ENDPOINTS.MANAGEMENT.APPLICANT(caseNo));
+  return res.data;
+}
+
 export async function getCaseBySubject(subjectId) {
   const res = await apiClient(API_ENDPOINTS.MANAGEMENT.BY_SUBJECT(subjectId));
   return res.data;

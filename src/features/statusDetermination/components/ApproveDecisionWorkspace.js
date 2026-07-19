@@ -30,9 +30,7 @@ const departmentOptions=[
 ];
 
 const finalStatuses=[
-  'Citizen by Birth','Citizen by Descent','Citizen by Naturalization','Citizen by Registration',
-  'Resident','Visitor','Refugee','Asylum Seeker','Stateless Person',
-  'Settled Migrant','Migrant','Illegal Migrant','Other Authorized Status'
+  'CITIZEN','MIGRANT','REFUGEE','ASYLUM_SEEKER','ILLEGAL_MIGRANT','LEGAL_MIGRANT'
 ];
 
 function SectionCard({title,icon,children,defaultOpen=true}){

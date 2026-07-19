@@ -134,6 +134,7 @@ export default function Biometric() {
   const [showCaptureModal, setShowCaptureModal] = useState(false);
   const [captureTarget, setCaptureTarget] = useState(null);
   const [captureStep, setCaptureStep] = useState(1);
+  const [waveMsg, setWaveMsg] = useState({ text: '', type: '' });
   const [photoCaptured, setPhotoCaptured] = useState(false);
   const [photoSaved, setPhotoSaved] = useState(false);
   const [cameraStarted, setCameraStarted] = useState(false);
@@ -2219,6 +2220,11 @@ export default function Biometric() {
             </div>
 
             {/* Footer */}
+            {waveMsg.text && (
+              <div className={`mx-5 mb-0 mt-2 px-4 py-2.5 rounded-xl text-sm font-medium flex items-center gap-2 ${waveMsg.type==='success'?'bg-green-50 text-green-700 border border-green-200':waveMsg.type==='error'?'bg-red-50 text-red-700 border border-red-200':'bg-blue-50 text-blue-700 border border-blue-200'}`}>
+                {waveMsg.type==='success'?<CheckCircle className="h-4 w-4 shrink-0"/>:<AlertTriangle className="h-4 w-4 shrink-0"/>}{waveMsg.text}
+              </div>
+            )}
             <div className="p-5 sm:p-6 border-t border-gray-100 bg-gray-50/50 flex items-center justify-between shrink-0 gap-3">
               <div>
                 {captureStep > 1 && (
@@ -2232,15 +2238,15 @@ export default function Biometric() {
                 <button
                   onClick={async () => {
                     if (!captureTarget) return;
+                    setWaveMsg({ text: 'Processing...', type: 'info' });
                     try {
                       await enrollCase(captureTarget.caseNo);
                       setQueue(prev => prev.filter(q => q.caseNo !== captureTarget.caseNo));
-                      setSuccessMsg('Biometric enrollment completed. Application forwarded to Assessment queue.');
-                      setTimeout(clearSuccess, 5000);
-                      closeCapture();
+                      setWaveMsg({ text: 'Enrolled successfully!', type: 'success' });
+                      setTimeout(() => { setWaveMsg({ text: '', type: '' }); closeCapture(); }, 1500);
                     } catch (e) {
-                      setSuccessMsg('Enrollment failed: ' + (e.message || 'Unknown error.'));
-                      setTimeout(clearSuccess, 4000);
+                      setWaveMsg({ text: e.message || 'Enrollment failed.', type: 'error' });
+                      setTimeout(() => setWaveMsg({ text: '', type: '' }), 4000);
                     }
                   }}
                   className="px-5 py-2.5 rounded-xl bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 transition-colors shadow-sm flex items-center gap-1.5"
@@ -2250,15 +2256,13 @@ export default function Biometric() {
                 {captureStep < 3 && (
                   <button
                     onClick={() => setCaptureStep(captureStep + 1)}
-                    disabled={captureStep === 1 ? !canProceedFromStep1() : !canProceedFromStep2()}
-                    className="px-5 py-2.5 rounded-xl bg-icrcs-navy text-white text-sm font-semibold hover:bg-icrcs-navy-light transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="px-5 py-2.5 rounded-xl bg-icrcs-navy text-white text-sm font-semibold hover:bg-icrcs-navy-light transition-colors shadow-sm"
                   >Next</button>
                 )}
                 {captureStep === 3 && (
                   <button
                     onClick={completeEnrollment}
-                    disabled={!canCompleteEnrollment()}
-                    className="px-5 py-2.5 rounded-xl bg-icrcs-gold text-white text-sm font-semibold hover:bg-yellow-500 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="px-5 py-2.5 rounded-xl bg-icrcs-gold text-white text-sm font-semibold hover:bg-yellow-500 transition-colors shadow-sm"
                   >Complete Enrollment</button>
                 )}
               </div>

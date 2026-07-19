@@ -129,6 +129,30 @@ export async function pollUntilTerminal(jobId, onTick, intervalMs = 300) {
   }
 }
 
+/**
+ * Open the live-preview WebSocket for an in-progress capture job. The agent
+ * relays RSWAS's own CanvasInfo feed (base64 PNG) roughly every 200ms while
+ * the job is IN_PROGRESS, then sends one final frameless status message and
+ * closes the socket itself once the job reaches a terminal state - this
+ * function does not need to poll or close proactively, only listen.
+ * @param {string} jobId
+ * @param {(frame: string) => void} onFrame   called with a base64 PNG each time a live frame arrives
+ * @returns {() => void} call to close the socket early (e.g. on unmount/cancel)
+ */
+export function openPreviewStream(jobId, onFrame) {
+  const wsUrl = `${DEVICE_SERVICE_URL.replace(/^http/, 'ws')}/ws/fingerprint/${jobId}`;
+  const socket = new WebSocket(wsUrl);
+  socket.onmessage = (event) => {
+    try {
+      const message = JSON.parse(event.data);
+      if (message.frame) onFrame(message.frame);
+    } catch {
+      // ignore malformed frames - the next one will self-correct
+    }
+  };
+  return () => socket.close();
+}
+
 // --- Mapping between the device's enum and this page's {hand, name} finger model ---
 
 /**
