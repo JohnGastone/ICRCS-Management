@@ -1,17 +1,18 @@
-import React,{useState,useRef}from'react';
+import React,{useState,useRef,useEffect}from'react';
 import{CheckCircle,XCircle,AlertTriangle,FileText,MessageSquare,ClipboardList,Upload,X,FolderOpen,SendHorizontal,User,ArrowLeft,ChevronDown,ChevronUp,Copy,Clock,Eye,Trash2,Plus,Download,Building2,RotateCcw,Check}from'lucide-react';
 import ApplicantInfoView from'../../../components/common/ApplicantInfoView';
-import{buildApplicant}from'../../../data/mockApplicantData';
+import{getApplicantReview}from'../../../services/managementService';
 
 const assessorCheckedItems=['Identity verification completed','Documents validated','Fingerprint verification reviewed','Interview conducted (if required)','Criminal/immigration check cleared','Eligibility confirmed'];
 const approverChecklistItems=['Travel history reviewed','Biometric enrollment verified','Medical clearance obtained','Financial proof assessed','Accommodation details confirmed','Security clearance approved'];
 
-const existingDocs=[
-  {id:1,name:'Passport Copy.pdf',type:'PDF',date:'12-Jun-2026 09:15',size:'1.2 MB',uploader:'G. Temu'},
-  {id:2,name:'Birth Certificate.pdf',type:'PDF',date:'12-Jun-2026 09:22',size:'0.8 MB',uploader:'G. Temu'},
-  {id:3,name:'Interview Report.pdf',type:'PDF',date:'12-Jun-2026 10:45',size:'2.1 MB',uploader:'J. Otieno'},
-  {id:4,name:'Assessment Summary.pdf',type:'PDF',date:'12-Jun-2026 11:20',size:'1.5 MB',uploader:'G. Temu'},
-];
+function mimeToExt(mimeType){
+  if(!mimeType)return'doc';
+  if(mimeType==='application/pdf')return'pdf';
+  if(mimeType==='image/jpeg'||mimeType==='image/jpg')return'jpg';
+  if(mimeType==='image/png')return'png';
+  return mimeType.split('/')[1]||'doc';
+}
 
 const history=[
   {id:1,ts:'12-Jun-2026 09:15 AM',officer:'G. Temu',text:'Assessment review initiated. All documents verified and biometric confirmation received.',recommendation:null},
@@ -62,6 +63,76 @@ function InfoRow({label,value,highlight,mono}){
 
 const statusBadge=s=>{const m={'Pending Approval':'bg-sky-50 text-sky-700 border-sky-200','Under Assessment':'bg-amber-50 text-amber-700 border-amber-200','In Progress':'bg-blue-50 text-blue-700 border-blue-200','Completed':'bg-green-50 text-green-700 border-green-200','Escalated':'bg-red-50 text-red-700 border-red-200'};return m[s]||'bg-gray-50 text-gray-600 border-gray-200'};
 
+function joinName(...parts){return parts.filter(Boolean).join(' ');}
+function joinPlace(...parts){return parts.filter(Boolean).join(', ')||'—';}
+
+function mapReviewToApplicant(r){
+  const p=r.personalDetails||{};
+  const birth=r.birthDetails||{};
+  const addrs=r.addresses||[];
+  const cur=addrs.find(a=>a.addressType==='CURRENT')||addrs[0];
+  const perm=addrs.find(a=>a.addressType==='PERMANENT');
+  const father=(r.parents||[]).find(x=>x.parentType==='FATHER');
+  const mother=(r.parents||[]).find(x=>x.parentType==='MOTHER');
+  const emp=r.employment;
+  const mapParent=(x,gender)=>x?{
+    fullName:joinName(x.firstName,x.middleName,x.lastName),
+    dob:x.dateOfBirth,gender,
+    phone:x.phoneNumber||'—',
+    nationality:x.nationality,
+    placeOfBirth:joinPlace(x.residenceLocation?.district,x.residenceCity,x.residenceCountry),
+    village:x.residenceLocation?.ward||'—',
+    residence:joinPlace(x.residenceLocation?.district,x.residenceCity,x.residenceCountry),
+  }:null;
+  const mapAddr=a=>a?{
+    country:a.country,
+    region:a.location?.region,
+    district:a.location?.district,
+    ward:a.location?.ward,
+    houseStreet:a.houseNo,
+    postalCode:a.postalAddress,
+  }:null;
+  return{
+    fullName:joinName(p.firstName,p.middleName,p.lastName),
+    gender:p.sex,dob:p.dateOfBirth,
+    citizenshipType:r.citizenshipType,
+    nationality:p.nationality,
+    countryOfBirth:p.countryOfBirth||birth.countryOfBirth,
+    region:cur?.location?.region,
+    district:cur?.location?.district,
+    ward:cur?.location?.ward,
+    villageStreet:cur?.location?.street,
+    birthCertificateNo:birth.birthCertificateNo||'—',
+    maritalStatus:p.maritalStatus,
+    phone:cur?.phoneNumber,
+    email:cur?.email,
+    currentAddress:mapAddr(cur),
+    permanentSameAsCurrent:!perm,
+    permanentAddress:mapAddr(perm),
+    father:mapParent(father,'Male'),
+    mother:mapParent(mother,'Female'),
+    education:(r.educationList||[]).map(e=>({
+      level:e.educationLevel,institution:e.schoolName,
+      completionYear:e.completionYear?String(e.completionYear):'—',
+      district:e.city||e.country||'—',indexNo:e.registrationNumber,
+    })),
+    employment:emp?{
+      status:emp.employmentStatus,
+      occupation:emp.occupationType||emp.otherOccupation||'—',
+      employer:emp.organizationName||'—',
+      nationalId:'—',
+    }:null,
+    emergencyContacts:(r.emergencyContacts||[]).map(c=>({
+      fullName:c.fullName,relationship:c.relationshipType,
+      occupation:'—',dob:'—',gender:'—',
+      phone:c.phoneNumber||'—',nationality:'—',
+      placeOfBirth:joinPlace(c.residenceLocation?.district,c.residenceCity,c.country),
+      village:c.residenceLocation?.ward||'—',
+      residence:joinPlace(c.residenceLocation?.district,c.residenceCity,c.country),
+    })),
+  };
+}
+
 export default function ApproveDecisionWorkspace({row,isOpen,onClose,onSubmit}){
   const[checks,setChecks]=useState(new Array(approverChecklistItems.length).fill(false));
   const[findings,setFindings]=useState('');
@@ -83,8 +154,35 @@ export default function ApproveDecisionWorkspace({row,isOpen,onClose,onSubmit}){
   const fileRefs=useRef({});
   const decisionFileRef=useRef({});
   const findingsRef=useRef(null);
+  const[reviewData,setReviewData]=useState(null);
+  const[applicantData,setApplicantData]=useState(null);
+  const[loadingApplicant,setLoadingApplicant]=useState(false);
+  const[applicantError,setApplicantError]=useState('');
+
+  useEffect(()=>{
+    if(!isOpen||!row?.caseNo)return;
+    setReviewData(null);setApplicantData(null);setApplicantError('');setLoadingApplicant(true);
+    getApplicantReview(row.caseNo)
+      .then(review=>{
+        if(review){setReviewData(review);setApplicantData(mapReviewToApplicant(review));}
+        else setApplicantError('No applicant data returned.');
+      })
+      .catch(err=>{
+        console.error('Applicant review error:', err);
+        setApplicantError(err.message||'Failed to load applicant data.');
+      })
+      .finally(()=>setLoadingApplicant(false));
+  },[isOpen,row?.caseNo]);
 
   if(!isOpen||!row)return null;
+
+  const isReadOnly=['approved','rejected','escalated to department','escalated'].includes(row.status?.toLowerCase());
+
+  const attachmentDocs=(reviewData?.attachments||[]).map((att,i)=>{
+    const ext=mimeToExt(att.mimeType);
+    const isImage=att.mimeType?.startsWith('image/');
+    return{id:i+1,attachmentType:att.attachmentType||'Document',name:(att.attachmentType||'Document')+'.'+ext,url:att.fileUrl,mimeType:att.mimeType||'application/pdf',isImage,ext};
+  });
 
   const toggle=i=>setChecks(c=>c.map((v,idx)=>idx===i?!v:v));
   const allDone=checks.every(Boolean);
@@ -136,13 +234,13 @@ export default function ApproveDecisionWorkspace({row,isOpen,onClose,onSubmit}){
     setConfirm(false);onClose();
   };
 
-  const applicant=buildApplicant(row);
+  const applicant=applicantData||{};
 
   const tabs=[
     {id:'info',label:'Applicant Info',icon:<User className="h-4 w-4"/>},
     {id:'attachments',label:'Attachments',icon:<FolderOpen className="h-4 w-4"/>},
     {id:'checklist',label:'Checklist',icon:<ClipboardList className="h-4 w-4"/>},
-    {id:'decision',label:'Decision',icon:<SendHorizontal className="h-4 w-4"/>}
+    ...(!isReadOnly?[{id:'decision',label:'Decision',icon:<SendHorizontal className="h-4 w-4"/>}]:[]),
   ];
 
   return(
@@ -163,6 +261,9 @@ export default function ApproveDecisionWorkspace({row,isOpen,onClose,onSubmit}){
         {/* Toast */}
         {toast&&<div className="mx-5 mt-3 p-3 rounded-xl bg-amber-50 border border-amber-100 flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" strokeWidth={2.5}/><span className="text-sm font-medium text-amber-700">{toast}</span><button onClick={()=>setToast('')} className="ml-auto"><X className="h-3.5 w-3.5 text-amber-600"/></button></div>}
 
+        {/* Read-only banner for finalized cases */}
+        {isReadOnly&&<div className="mx-5 mt-3 p-3 rounded-xl bg-green-50 border border-green-200 flex items-center gap-2"><CheckCircle className="h-4 w-4 text-green-600 shrink-0" strokeWidth={2.5}/><span className="text-sm font-medium text-green-800">This case has already been <strong>{row.status.toLowerCase()}</strong> and cannot be modified. View-only mode.</span></div>}
+
         {/* Tabs */}
         <div className="px-5 sm:px-6 pt-4 border-b border-gray-100 bg-white">
           <div className="flex gap-1 overflow-x-auto">
@@ -172,34 +273,47 @@ export default function ApproveDecisionWorkspace({row,isOpen,onClose,onSubmit}){
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-5 sm:p-6">
-          {activeTab==='info'&&<ApplicantInfoView data={applicant}/>}
+          {activeTab==='info'&&(loadingApplicant
+            ?<div className="flex items-center justify-center py-20 text-sm text-gray-400">Loading applicant data...</div>
+            :applicantError
+              ?<div className="flex flex-col items-center justify-center py-20 gap-2">
+                 <p className="text-sm text-red-500 font-medium">Failed to load applicant data</p>
+                 <p className="text-xs text-gray-400">{applicantError}</p>
+               </div>
+              :<ApplicantInfoView data={applicant}/>
+          )}
 
           {activeTab==='attachments'&&(
             <div className="flex flex-col lg:flex-row gap-5">
               <div className="lg:w-[55%] space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-gray-800">Existing Documents ({existingDocs.length})</h3>
+                  <h3 className="text-sm font-bold text-gray-800">
+                    {loadingApplicant?'Applicant Documents (loading…)':`Applicant Documents (${attachmentDocs.length})`}
+                  </h3>
                   <span className="text-xs text-gray-400">Read-only view. Download or preview only.</span>
                 </div>
+                {applicantError&&<p className="text-xs text-red-500">{applicantError}</p>}
                 <div className="space-y-2">
-                  {existingDocs.map(d=>{
-                    const ext=d.name.split('.').pop().toLowerCase();
-                    return(
-                      <div key={d.id} className="flex items-center justify-between gap-2 p-3 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-gray-50 transition-colors">
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="h-9 w-9 rounded-lg bg-red-50 flex items-center justify-center shrink-0"><span className="text-[9px] font-bold text-red-600 uppercase">{ext}</span></div>
-                          <div className="min-w-0">
-                            <div className="text-xs font-medium text-gray-700 truncate">{d.name}</div>
-                            <div className="text-[10px] text-gray-400">{d.size} &middot; {d.date} &middot; {d.uploader}</div>
-                          </div>
+                  {attachmentDocs.length===0&&!loadingApplicant&&(
+                    <div className="text-xs text-gray-400 py-4 text-center">No attachments found for this applicant.</div>
+                  )}
+                  {attachmentDocs.map(d=>(
+                    <div key={d.id} className="flex items-center justify-between gap-2 p-3 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-gray-50 transition-colors">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${d.isImage?'bg-blue-50':'bg-red-50'}`}>
+                          <span className={`text-[9px] font-bold uppercase ${d.isImage?'text-blue-600':'text-red-600'}`}>{d.ext}</span>
                         </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button onClick={()=>setPreviewDoc(d)} className="p-1.5 rounded-lg hover:bg-white text-gray-400 hover:text-icrcs-navy transition-colors" title="Preview"><Eye className="h-3.5 w-3.5"/></button>
-                          <button className="p-1.5 rounded-lg hover:bg-white text-gray-400 hover:text-icrcs-navy transition-colors" title="Download"><Download className="h-3.5 w-3.5"/></button>
+                        <div className="min-w-0">
+                          <div className="text-xs font-medium text-gray-700 truncate">{d.name}</div>
+                          <div className="text-[10px] text-gray-400">{d.attachmentType}</div>
                         </div>
                       </div>
-                    );
-                  })}
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button onClick={()=>setPreviewDoc(d)} className="p-1.5 rounded-lg hover:bg-white text-gray-400 hover:text-icrcs-navy transition-colors" title="Preview"><Eye className="h-3.5 w-3.5"/></button>
+                        <a href={d.url} target="_blank" rel="noreferrer" download={d.name} className="p-1.5 rounded-lg hover:bg-white text-gray-400 hover:text-icrcs-navy transition-colors" title="Download"><Download className="h-3.5 w-3.5"/></a>
+                      </div>
+                    </div>
+                  ))}
                 </div>
                 {docFields.length>0&&(
                   <>
@@ -245,18 +359,24 @@ export default function ApproveDecisionWorkspace({row,isOpen,onClose,onSubmit}){
                 {previewDoc?(
                   <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 h-full flex flex-col">
                     <div className="flex items-center justify-between mb-3 pb-3 border-b border-gray-100">
-                      <div className="flex items-center gap-2"><FileText className="h-4 w-4 text-icrcs-navy"/><span className="text-sm font-semibold text-gray-700">Document Preview</span></div>
-                      <button onClick={()=>setPreviewDoc(null)} className="p-1 rounded hover:bg-gray-100 text-gray-400"><X className="h-3.5 w-3.5"/></button>
+                      <div className="flex items-center gap-2"><FileText className="h-4 w-4 text-icrcs-navy"/><span className="text-sm font-semibold text-gray-700 truncate max-w-[180px]">{previewDoc.name}</span></div>
+                      <button onClick={()=>setPreviewDoc(null)} className="p-1 rounded hover:bg-gray-100 text-gray-400 shrink-0"><X className="h-3.5 w-3.5"/></button>
                     </div>
-                    <div className="flex-1 rounded-lg bg-gray-50 border border-gray-100 p-6 flex flex-col items-center justify-center text-center min-h-[280px]">
-                      <div className="h-16 w-16 rounded-2xl bg-red-50 flex items-center justify-center mb-3"><span className="text-sm font-bold text-red-600 uppercase">{previewDoc.name.split('.').pop()}</span></div>
-                      <p className="text-sm font-medium text-gray-700 mb-1">{previewDoc.name}</p>
-                      <p className="text-xs text-gray-400 mb-4">{previewDoc.size||''} &middot; {previewDoc.date||''}</p>
-                      <div className="flex items-center gap-2">
-                        <button className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-500 hover:bg-white transition-colors flex items-center gap-1"><Download className="h-3 w-3"/>Download</button>
-                        <button className="px-3 py-1.5 rounded-lg bg-icrcs-navy text-white text-xs font-medium hover:bg-icrcs-navy-light transition-colors">Open in Viewer</button>
+                    {previewDoc.isImage?(
+                      <div className="flex-1 rounded-lg bg-gray-50 border border-gray-100 overflow-hidden flex items-center justify-center min-h-[280px]">
+                        <img src={previewDoc.url} alt={previewDoc.name} className="max-w-full max-h-[420px] object-contain rounded"/>
                       </div>
-                    </div>
+                    ):(()=>{const src=previewDoc.url||previewDoc.preview;return(
+                      <div className="flex-1 rounded-lg bg-gray-50 border border-gray-100 p-6 flex flex-col items-center justify-center text-center min-h-[280px]">
+                        <div className="h-16 w-16 rounded-2xl bg-red-50 flex items-center justify-center mb-3"><span className="text-sm font-bold text-red-600 uppercase">{previewDoc.ext||'PDF'}</span></div>
+                        <p className="text-sm font-medium text-gray-700 mb-1">{previewDoc.name}</p>
+                        {previewDoc.attachmentType&&<p className="text-xs text-gray-400 mb-4">{previewDoc.attachmentType}</p>}
+                        {src&&<div className="flex items-center gap-2">
+                          <a href={src} target="_blank" rel="noreferrer" download={previewDoc.name} className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-500 hover:bg-white transition-colors flex items-center gap-1"><Download className="h-3 w-3"/>Download</a>
+                          <button onClick={()=>window.open(src,'_blank')} className="px-3 py-1.5 rounded-lg bg-icrcs-navy text-white text-xs font-medium hover:bg-icrcs-navy-light transition-colors">Open in Browser</button>
+                        </div>}
+                      </div>
+                    );})()}
                   </div>
                 ):(
                   <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 h-full flex flex-col items-center justify-center text-center min-h-[280px]">
@@ -297,7 +417,7 @@ export default function ApproveDecisionWorkspace({row,isOpen,onClose,onSubmit}){
                   {approverChecklistItems.map((item,i)=>{
                     const c=checks[i];
                     return(
-                      <div key={i} onClick={()=>toggle(i)} className="flex items-center justify-between gap-2 py-2.5 border-b border-gray-100 cursor-pointer hover:bg-gray-50/60 rounded-lg px-3 transition-colors">
+                      <div key={i} onClick={()=>!isReadOnly&&toggle(i)} className={`flex items-center justify-between gap-2 py-2.5 border-b border-gray-100 rounded-lg px-3 transition-colors ${isReadOnly?'cursor-default':'cursor-pointer hover:bg-gray-50/60'}`}>
                         <span className={`text-sm ${c?'text-gray-500 line-through':'text-gray-700'}`}>{item}</span>
                         {c?<CheckCircle className="h-4 w-4 text-green-500 shrink-0" strokeWidth={2.5}/>:<div className="h-4 w-4 rounded-full border-2 border-gray-200 shrink-0"/>}
                       </div>
@@ -435,8 +555,8 @@ export default function ApproveDecisionWorkspace({row,isOpen,onClose,onSubmit}){
 
         {/* Footer */}
         <div className="p-5 sm:p-6 border-t border-gray-100 bg-gray-50/50 flex items-center justify-between shrink-0 sticky bottom-0">
-          <button onClick={onClose} className="px-5 py-2.5 rounded-xl border border-gray-200 text-base font-medium text-gray-500 hover:bg-white transition-colors">Cancel</button>
-          <div className="flex items-center gap-2">
+          <button onClick={onClose} className="px-5 py-2.5 rounded-xl border border-gray-200 text-base font-medium text-gray-500 hover:bg-white transition-colors">Close</button>
+          {!isReadOnly&&<div className="flex items-center gap-2">
             {!confirm?(
               <button onClick={()=>setConfirm(true)} className="px-6 py-2.5 rounded-xl bg-icrcs-navy text-white text-base font-semibold hover:bg-icrcs-navy-light transition-colors shadow-sm flex items-center gap-1.5"><SendHorizontal className="h-4 w-4"/>Submit Decision</button>
             ):(
@@ -446,7 +566,7 @@ export default function ApproveDecisionWorkspace({row,isOpen,onClose,onSubmit}){
                 <button onClick={submit} className="text-sm px-2 py-1 rounded-lg bg-amber-500 text-white font-semibold hover:bg-amber-600 transition-colors">Confirm</button>
               </div>
             )}
-          </div>
+          </div>}
         </div>
       </div>
     </div>

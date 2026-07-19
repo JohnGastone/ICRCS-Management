@@ -1,5 +1,5 @@
 import React,{useState,useEffect,useCallback}from'react';
-import{ClipboardCheck,CheckCircle,XCircle,AlertTriangle,RotateCcw,Search,ChevronDown,ArrowUpDown,FolderOpen,X}from'lucide-react';
+import{ClipboardCheck,CheckCircle,XCircle,AlertTriangle,RotateCcw,Search,ChevronDown,ArrowUpDown,FolderOpen,Eye,X}from'lucide-react';
 import ApproveDecisionWorkspace from'../components/ApproveDecisionWorkspace';
 import{getApprovalQueue,decideCase}from'../../../services/managementService';
 
@@ -18,6 +18,7 @@ const mockCases=[
 {caseNo:'ICRCS-DEC-2026-000109',appNo:'APP-2026-000156',fullName:'Esther Wanjiku',nationality:'Kenyan',gender:'Female',dob:'03-May-1986',passportNo:'A55667788',status:'Returned to Assessment',priority:'High',assignedDate:'01-Jun-2026',officer:'James Otieno',decision:'More Info'},
 ];
 
+const isTerminal=s=>['approved','rejected','escalated to department','escalated'].includes(s?.toLowerCase());
 const statusBadge=s=>{const m={'Pending Approval':'bg-sky-50 text-sky-700 border-sky-200','Approved':'bg-green-50 text-green-700 border-green-200','Rejected':'bg-red-50 text-red-700 border-red-200','Returned to Assessment':'bg-amber-50 text-amber-700 border-amber-200','Escalated to Department':'bg-purple-50 text-purple-700 border-purple-200'};return m[s]||'bg-gray-50 text-gray-600 border-gray-200'};
 const priorityBadge=p=>{const m={'High':'bg-red-50 text-red-700 border-red-200','Medium':'bg-amber-50 text-amber-700 border-amber-200','Low':'bg-green-50 text-green-700 border-green-200'};return m[p]||'bg-gray-50 text-gray-600 border-gray-200'};
 const decisionBadge=d=>{const m={'Approve':'bg-green-50 text-green-700 border-green-200','Reject':'bg-red-50 text-red-700 border-red-200','Escalate':'bg-purple-50 text-purple-700 border-purple-200','More Info':'bg-amber-50 text-amber-700 border-amber-200'};return m[d]||'bg-gray-50 text-gray-600 border-gray-200'};
@@ -144,7 +145,7 @@ return(
       <td className="px-4 py-3"><span className={`text-sm px-2 py-0.5 rounded-full border font-medium ${priorityBadge(row.priority)}`}>{row.priority}</span></td>
       <td className="px-4 py-3"><span className={`text-sm px-2 py-0.5 rounded-full border font-medium ${decisionBadge(row.decision)}`}>{row.decision}</span></td>
       <td className="px-4 py-3 text-sm text-gray-500">{row.assignedDate}</td>
-      <td className="px-4 py-3 text-right"><button onClick={()=>openWorkspace(row)} className="px-2.5 py-1.5 rounded-lg bg-icrcs-navy text-white text-sm font-semibold hover:bg-icrcs-navy-light transition-colors shadow-sm flex items-center gap-1 ml-auto"><FolderOpen className="h-3 w-3"/>Open</button></td>
+      <td className="px-4 py-3 text-right">{isTerminal(row.status)?(<button onClick={()=>openWorkspace(row)} className="px-2.5 py-1.5 rounded-lg bg-gray-100 text-gray-600 text-sm font-semibold hover:bg-gray-200 transition-colors shadow-sm flex items-center gap-1 ml-auto"><Eye className="h-3 w-3"/>View</button>):(<button onClick={()=>openWorkspace(row)} className="px-2.5 py-1.5 rounded-lg bg-icrcs-navy text-white text-sm font-semibold hover:bg-icrcs-navy-light transition-colors shadow-sm flex items-center gap-1 ml-auto"><FolderOpen className="h-3 w-3"/>Open</button>)}</td>
      </tr>)}
      {paginated.length===0&&<tr><td colSpan={8} className="px-4 py-12 text-center text-sm text-gray-400">No cases found matching your criteria.</td></tr>}
     </tbody>
