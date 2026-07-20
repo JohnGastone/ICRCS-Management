@@ -13,8 +13,8 @@ import Enquiries from '../features/enquiries/pages/Enquiries';
 import Reports from '../features/reports/pages/Reports';
 
 const ALL_ROLES = ['registration_officer','assessor','approver','etd_officer','admin','management'];
-const ASSESSOR_ROLES = ['assessor','admin'];
-const APPROVER_ROLES = ['assessor','approver','admin'];
+const ASSESSOR_ROLES = ['registration_officer','assessor','admin'];
+const APPROVER_ROLES = ['registration_officer','assessor','approver','admin'];
 const ADMIN_MGMT = ['admin','management'];
 
 export default function AppRoutes() {
@@ -24,7 +24,7 @@ export default function AppRoutes() {
       <Route path="/internal/dashboard" element={<ProtectedRoute allowedRoles={ALL_ROLES}><Dashboard /></ProtectedRoute>} />
       <Route path="/internal/biometric" element={<ProtectedRoute allowedRoles={['registration_officer','assessor','admin']}><Biometric /></ProtectedRoute>} />
       <Route path="/internal/assessment" element={<ProtectedRoute allowedRoles={ASSESSOR_ROLES}><Assessment /></ProtectedRoute>} />
-      <Route path="/internal/adjudication" element={<ProtectedRoute allowedRoles={['assessor','approver','admin']}><Adjudication /></ProtectedRoute>} />
+      <Route path="/internal/adjudication" element={<ProtectedRoute allowedRoles={APPROVER_ROLES}><Adjudication /></ProtectedRoute>} />
       <Route path="/internal/approve-decision" element={<ProtectedRoute allowedRoles={APPROVER_ROLES}><ApproveDecision /></ProtectedRoute>} />
       <Route path="/internal/escalate-case" element={<ProtectedRoute allowedRoles={APPROVER_ROLES}><EscalateCase /></ProtectedRoute>} />
       <Route path="/internal/escalation" element={<ProtectedRoute allowedRoles={['approver','admin','management']}><EscalationCases /></ProtectedRoute>} />

@@ -8,6 +8,7 @@ import {
   startCapture,
   startGroupCapture,
   pollUntilTerminal,
+  openPreviewStream,
   POSITION_TO_FINGER,
   FINGER_TO_POSITION,
   GROUP_KEY_TO_DEVICE,
@@ -105,6 +106,7 @@ export default function Biometric() {
   const [showCaptureModal, setShowCaptureModal] = useState(false);
   const [captureTarget, setCaptureTarget] = useState(null);
   const [captureStep, setCaptureStep] = useState(1);
+  const [waveMsg, setWaveMsg] = useState({ text: '', type: '' });
   const [photoCaptured, setPhotoCaptured] = useState(false);
   const [photoSaved, setPhotoSaved] = useState(false);
   const [cameraStarted, setCameraStarted] = useState(false);
@@ -141,6 +143,9 @@ export default function Biometric() {
   });
   const [selectedFinger, setSelectedFinger] = useState(null);
   const [scanningFinger, setScanningFinger] = useState(null);
+  // Latest base64 PNG frame from the scanner's live-preview WebSocket, shown in
+  // the viewfinder panel while scanningFinger is set. Cleared once the job ends.
+  const [livePreviewFrame, setLivePreviewFrame] = useState(null);
   // base64 image + ISO template per captured finger, keyed [hand][name] - held in
   // a ref so it survives re-renders without triggering them; read at enrollment.
   const capturedArtifactsRef = React.useRef({ left: {}, right: {}, thumbs: {} });
@@ -150,6 +155,9 @@ export default function Biometric() {
   const rowsPerPageOptions = [5, 20, 50, 100];
   const [sortField, setSortField] = useState('dateReceived');
   const [sortDir, setSortDir] = useState('desc');
+
+  const [showQuickServeModal, setShowQuickServeModal] = useState(false);
+  const [quickServeTarget, setQuickServeTarget] = useState(null);
 
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewTarget, setViewTarget] = useState(null);
@@ -172,8 +180,23 @@ export default function Biometric() {
     try {
       const c = await getCaseBySubject(appNumber.trim());
       if (!c) { setError('No case found for that Subject ID.'); return; }
-      if (queue.some(q => q.appNo === c.subjectId || q.caseNo === c.caseNo)) {
-        setError('This case is already in the enrollment queue.');
+      const existingRow = queue.find(q => q.appNo === c.subjectId || q.caseNo === c.caseNo);
+      if (existingRow) {
+        const sexId = c.person?.sexId;
+        const photoUrl = c.applicantData?.attachments?.find(
+          a => a.attachmentType === 'Applicant Passport Size Photo'
+        )?.fileUrl || null;
+        setQuickServeTarget({
+          queueRow: existingRow,
+          fullName: c.person?.fullName || existingRow.fullName || c.subjectId,
+          sex: sexId === 1 ? 'Male' : sexId === 2 ? 'Female' : 'N/A',
+          dob: c.person?.dateOfBirth || 'N/A',
+          nationality: c.person?.nationalityCode || existingRow.nationality,
+          caseNo: c.caseNo || existingRow.caseNo,
+          appNo: c.subjectId,
+          photoUrl,
+        });
+        setShowQuickServeModal(true);
         return;
       }
       setFetchedApp({
@@ -196,6 +219,7 @@ export default function Biometric() {
   };
 
   const closeReviewModal = () => { setShowReviewModal(false); setFetchedApp(null); setReviewRemarks(''); setReleaseRemarksError(''); setActiveReviewTab('info'); setPreviewDoc(null); };
+  const closeQuickServeModal = () => { setShowQuickServeModal(false); setQuickServeTarget(null); };
 
   const saveToBiometricEnrollment = () => {
     if (!fetchedApp) return;
@@ -292,6 +316,13 @@ export default function Biometric() {
     const fingerName = name === 'index' ? 'Index' : name === 'middle' ? 'Middle' : name === 'ring' ? 'Ring' : name === 'pinky' ? 'Little' : 'Thumb';
     return `${handLabel} ${fingerName}`;
   };
+  const getScanningLabel = () => {
+    if (!scanningFinger) return '';
+    if (scanningFinger.group) {
+      return scanningFinger.group === 'left' ? 'Left Four Fingers' : scanningFinger.group === 'right' ? 'Right Four Fingers' : 'Two Thumbs';
+    }
+    return getFingerLabel(scanningFinger.hand, scanningFinger.name);
+  };
   // NFIQ scale: 1 = best, 5 = worst.
   const getQualityLabel = (q) => {
     if (q <= 2) return { label: 'Excellent', badgeClass: 'bg-icrcs-gold/10 text-icrcs-gold border-icrcs-gold/30' };
@@ -358,8 +389,10 @@ export default function Biometric() {
 
     setScanningFinger({ group: groupKey });
     setGroupStatus(pending, 'capturing');
+    let closePreview = () => {};
     try {
       const jobId = await startGroupCapture(GROUP_KEY_TO_DEVICE[groupKey]);
+      closePreview = openPreviewStream(jobId, setLivePreviewFrame);
       const job = await pollUntilTerminal(jobId);
       if (job.status !== 'COMPLETED') {
         setGroupStatus(pending, 'failed');
@@ -385,6 +418,8 @@ export default function Biometric() {
       setSuccessMsg(`Scanner error: ${e instanceof Error ? e.message : String(e)}`);
       setTimeout(clearSuccess, 5000);
     } finally {
+      closePreview();
+      setLivePreviewFrame(null);
       setScanningFinger(null);
     }
   };
@@ -402,8 +437,10 @@ export default function Biometric() {
     if (!position) return;
     setScanningFinger({ hand, name });
     setFingerprints(fp => ({ ...fp, [hand]: { ...fp[hand], [name]: 'capturing' } }));
+    let closePreview = () => {};
     try {
       const jobId = await startCapture(position);
+      closePreview = openPreviewStream(jobId, setLivePreviewFrame);
       const job = await pollUntilTerminal(jobId);
       if (job.status !== 'COMPLETED') {
         setFingerprints(fp => ({ ...fp, [hand]: { ...fp[hand], [name]: 'failed' } }));
@@ -426,6 +463,8 @@ export default function Biometric() {
       setSuccessMsg(`Scanner error: ${e instanceof Error ? e.message : String(e)}`);
       setTimeout(clearSuccess, 5000);
     } finally {
+      closePreview();
+      setLivePreviewFrame(null);
       setScanningFinger(null);
     }
   };
@@ -959,6 +998,85 @@ export default function Biometric() {
                 <button onClick={closeReviewModal} className="px-5 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-white transition-colors">Cancel</button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Quick-Serve Modal — applicant already in queue */}
+      {showQuickServeModal && quickServeTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-sm overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <div>
+                <h2 className="text-base font-bold text-gray-800">Applicant Found</h2>
+                <p className="text-xs text-gray-400 font-mono mt-0.5">{quickServeTarget.caseNo}</p>
+              </div>
+              <button onClick={closeQuickServeModal} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+                <X className="h-4 w-4 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-5 flex flex-col items-center gap-4">
+              {/* Passport-size photo */}
+              <div className="h-32 w-26 rounded-xl border-2 border-gray-200 overflow-hidden shadow-sm bg-gray-100 flex items-center justify-center" style={{ width: '6.5rem', height: '8rem' }}>
+                {quickServeTarget.photoUrl ? (
+                  <img
+                    src={quickServeTarget.photoUrl}
+                    alt="Passport photo"
+                    className="w-full h-full object-cover"
+                    onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
+                  />
+                ) : null}
+                <div className={`w-full h-full flex-col items-center justify-center gap-1 ${quickServeTarget.photoUrl ? 'hidden' : 'flex'}`}>
+                  <User className="h-12 w-12 text-gray-300" />
+                  <span className="text-[9px] text-gray-400 font-medium uppercase tracking-wide">No Photo</span>
+                </div>
+              </div>
+
+              {/* Info rows */}
+              <div className="w-full divide-y divide-gray-50 text-sm">
+                <div className="flex justify-between py-2">
+                  <span className="text-gray-500">Full Name</span>
+                  <span className="font-semibold text-gray-900 text-right max-w-[60%] leading-tight">{quickServeTarget.fullName}</span>
+                </div>
+                <div className="flex justify-between py-2">
+                  <span className="text-gray-500">Gender</span>
+                  <span className="font-semibold text-gray-900">{quickServeTarget.sex}</span>
+                </div>
+                <div className="flex justify-between py-2">
+                  <span className="text-gray-500">Date of Birth</span>
+                  <span className="font-semibold text-gray-900">{quickServeTarget.dob}</span>
+                </div>
+                <div className="flex justify-between py-2">
+                  <span className="text-gray-500">Nationality</span>
+                  <span className="font-semibold text-gray-900">{quickServeTarget.nationality}</span>
+                </div>
+                <div className="flex justify-between py-2">
+                  <span className="text-gray-500">App No</span>
+                  <span className="font-mono text-xs font-semibold text-gray-700">{quickServeTarget.appNo}</span>
+                </div>
+              </div>
+
+              {/* Status note */}
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 w-full text-center">
+                Already in enrollment queue — ready for biometric capture.
+              </p>
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 pb-5 flex gap-3">
+              <button onClick={closeQuickServeModal} className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition-colors">
+                Close
+              </button>
+              <button
+                onClick={() => { closeQuickServeModal(); openCapture(quickServeTarget.queueRow); }}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-icrcs-navy text-white text-sm font-semibold hover:bg-icrcs-navy-light transition-colors flex items-center justify-center gap-2 shadow-sm"
+              >
+                <Camera className="h-4 w-4" /> Start Capture
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1730,6 +1848,35 @@ export default function Biometric() {
                       </div>
                     )}
 
+                    {/* Live Scanner Preview - mirrors RSWAS's own CanvasInfo feed over
+                        the WebSocket opened in captureGroup/captureSingleFinger, so the
+                        operator sees the finger on the glass instantly instead of a bare
+                        spinner while the capture is in progress. */}
+                    {scanningFinger && (
+                      <div className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-gray-900 border border-gray-800">
+                        <div className="flex items-center justify-between w-full max-w-sm">
+                          <span className="flex items-center gap-1.5 text-xs font-bold text-red-400 uppercase tracking-wider">
+                            <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" /> Live
+                          </span>
+                          <span className="text-xs font-medium text-gray-300">Scanning: {getScanningLabel()}</span>
+                        </div>
+                        <div className="w-full max-w-sm h-[220px] rounded-xl bg-black flex items-center justify-center overflow-hidden">
+                          {livePreviewFrame ? (
+                            <img
+                              src={livePreviewFrame.startsWith('data:') ? livePreviewFrame : `data:image/png;base64,${livePreviewFrame}`}
+                              alt="Live scanner preview"
+                              className="w-full h-full object-contain"
+                            />
+                          ) : (
+                            <div className="flex flex-col items-center gap-2 text-gray-500">
+                              <Fingerprint className="h-10 w-10 animate-pulse" />
+                              <span className="text-xs font-medium">Place your hand on the scanner...</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Row 1: Left Four Fingers */}
                     <div className="space-y-2">
                       <h5 className="text-sm font-medium text-gray-500 uppercase tracking-wider">Left Four Fingers</h5>
@@ -2037,6 +2184,11 @@ export default function Biometric() {
             </div>
 
             {/* Footer */}
+            {waveMsg.text && (
+              <div className={`mx-5 mb-0 mt-2 px-4 py-2.5 rounded-xl text-sm font-medium flex items-center gap-2 ${waveMsg.type==='success'?'bg-green-50 text-green-700 border border-green-200':waveMsg.type==='error'?'bg-red-50 text-red-700 border border-red-200':'bg-blue-50 text-blue-700 border border-blue-200'}`}>
+                {waveMsg.type==='success'?<CheckCircle className="h-4 w-4 shrink-0"/>:<AlertTriangle className="h-4 w-4 shrink-0"/>}{waveMsg.text}
+              </div>
+            )}
             <div className="p-5 sm:p-6 border-t border-gray-100 bg-gray-50/50 flex items-center justify-between shrink-0 gap-3">
               <div>
                 {captureStep > 1 && (
@@ -2046,19 +2198,35 @@ export default function Biometric() {
                   <button onClick={closeCapture} className="px-5 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-white transition-colors">Cancel</button>
                 )}
               </div>
-              <div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={async () => {
+                    if (!captureTarget) return;
+                    setWaveMsg({ text: 'Processing...', type: 'info' });
+                    try {
+                      await enrollCase(captureTarget.caseNo);
+                      setQueue(prev => prev.filter(q => q.caseNo !== captureTarget.caseNo));
+                      setWaveMsg({ text: 'Enrolled successfully!', type: 'success' });
+                      setTimeout(() => { setWaveMsg({ text: '', type: '' }); closeCapture(); }, 1500);
+                    } catch (e) {
+                      setWaveMsg({ text: e.message || 'Enrollment failed.', type: 'error' });
+                      setTimeout(() => setWaveMsg({ text: '', type: '' }), 4000);
+                    }
+                  }}
+                  className="px-5 py-2.5 rounded-xl bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 transition-colors shadow-sm flex items-center gap-1.5"
+                >
+                  <CheckCircle className="h-4 w-4" /> Wave Biometrics
+                </button>
                 {captureStep < 3 && (
                   <button
                     onClick={() => setCaptureStep(captureStep + 1)}
-                    disabled={captureStep === 1 ? !canProceedFromStep1() : !canProceedFromStep2()}
-                    className="px-5 py-2.5 rounded-xl bg-icrcs-navy text-white text-sm font-semibold hover:bg-icrcs-navy-light transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="px-5 py-2.5 rounded-xl bg-icrcs-navy text-white text-sm font-semibold hover:bg-icrcs-navy-light transition-colors shadow-sm"
                   >Next</button>
                 )}
                 {captureStep === 3 && (
                   <button
                     onClick={completeEnrollment}
-                    disabled={!canCompleteEnrollment()}
-                    className="px-5 py-2.5 rounded-xl bg-icrcs-gold text-white text-sm font-semibold hover:bg-yellow-500 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="px-5 py-2.5 rounded-xl bg-icrcs-gold text-white text-sm font-semibold hover:bg-yellow-500 transition-colors shadow-sm"
                   >Complete Enrollment</button>
                 )}
               </div>
