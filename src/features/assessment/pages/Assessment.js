@@ -1,22 +1,7 @@
 import React,{useState,useEffect,useCallback}from'react';
 import{ClipboardCheck,CheckCircle,XCircle,AlertTriangle,ClipboardList,Search,ChevronDown,ArrowUpDown,FolderOpen,RotateCcw,X}from'lucide-react';
 import AssessmentWorkspace from'../components/AssessmentWorkspace';
-import{getAssessmentQueue,assessCase}from'../../../services/managementService';
-
-const mockAssessments=[
-{caseNo:'ICRCS-ASM-2026-000120',appNo:'APP-2026-000145',fullName:'John Michael Doe',nationality:'Kenyan',gender:'Male',dob:'10-Jan-1990',passportNo:'A12345678',status:'Under Assessment',priority:'High',assignedDate:'12-Jun-2026',officer:'Grace Temu',documents:['passport_copy.pdf','birth_cert.jpg']},
-{caseNo:'ICRCS-ASM-2026-000119',appNo:'APP-2026-000146',fullName:'Amina Hassan',nationality:'Tanzanian',gender:'Female',dob:'15-Mar-1988',passportNo:'T98765432',status:'Pending Assessment',priority:'Medium',assignedDate:'11-Jun-2026',officer:'James Otieno',documents:['passport.pdf']},
-{caseNo:'ICRCS-ASM-2026-000118',appNo:'APP-2026-000147',fullName:'Robert Kimaro',nationality:'Kenyan',gender:'Male',dob:'22-Jul-1992',passportNo:'A87654321',status:'In Progress',priority:'High',assignedDate:'10-Jun-2026',officer:'Grace Temu',documents:['id_card.jpg','utility_bill.pdf']},
-{caseNo:'ICRCS-ASM-2026-000117',appNo:'APP-2026-000148',fullName:'Halima Said',nationality:'Rwandan',gender:'Female',dob:'05-Nov-1985',passportNo:'R11223344',status:'Under Assessment',priority:'Low',assignedDate:'09-Jun-2026',officer:'Juma Kipanya',documents:['passport.pdf','marriage_cert.jpg']},
-{caseNo:'ICRCS-ASM-2026-000116',appNo:'APP-2026-000149',fullName:'Michael Bwire',nationality:'Ugandan',gender:'Male',dob:'18-Sep-1995',passportNo:'U55667788',status:'Completed',priority:'Medium',assignedDate:'08-Jun-2026',officer:'James Otieno',documents:['passport.pdf']},
-{caseNo:'ICRCS-ASM-2026-000115',appNo:'APP-2026-000150',fullName:'Fatma Juma',nationality:'Burundian',gender:'Female',dob:'30-Jan-1990',passportNo:'B99887766',status:'Escalated',priority:'High',assignedDate:'07-Jun-2026',officer:'Grace Temu',documents:['passport.jpg','ref_letter.pdf']},
-{caseNo:'ICRCS-ASM-2026-000114',appNo:'APP-2026-000151',fullName:'Peter Ochieng',nationality:'Kenyan',gender:'Male',dob:'12-Apr-1987',passportNo:'A33445566',status:'Pending Assessment',priority:'Medium',assignedDate:'06-Jun-2026',officer:'Juma Kipanya',documents:['passport.pdf']},
-{caseNo:'ICRCS-ASM-2026-000113',appNo:'APP-2026-000152',fullName:'Joyce Mwende',nationality:'Tanzanian',gender:'Female',dob:'25-Dec-1993',passportNo:'T77889900',status:'In Progress',priority:'Low',assignedDate:'05-Jun-2026',officer:'Grace Temu',documents:['id_card.jpg']},
-{caseNo:'ICRCS-ASM-2026-000112',appNo:'APP-2026-000153',fullName:'Daniel Ndayisaba',nationality:'Burundian',gender:'Male',dob:'08-Jun-1991',passportNo:'B22334455',status:'Under Assessment',priority:'High',assignedDate:'04-Jun-2026',officer:'James Otieno',documents:['passport.pdf','employment_letter.pdf']},
-{caseNo:'ICRCS-ASM-2026-000111',appNo:'APP-2026-000154',fullName:'Grace Akello',nationality:'Ugandan',gender:'Female',dob:'14-Feb-1989',passportNo:'U66778899',status:'Completed',priority:'Medium',assignedDate:'03-Jun-2026',officer:'Juma Kipanya',documents:['passport.jpg']},
-{caseNo:'ICRCS-ASM-2026-000110',appNo:'APP-2026-000155',fullName:'Samuel Kagame',nationality:'Rwandan',gender:'Male',dob:'19-Oct-1994',passportNo:'R44556677',status:'Pending Assessment',priority:'Low',assignedDate:'02-Jun-2026',officer:'Grace Temu',documents:['passport.pdf']},
-{caseNo:'ICRCS-ASM-2026-000109',appNo:'APP-2026-000156',fullName:'Esther Wanjiku',nationality:'Kenyan',gender:'Female',dob:'03-May-1986',passportNo:'A55667788',status:'Under Assessment',priority:'High',assignedDate:'01-Jun-2026',officer:'James Otieno',documents:['passport.pdf','medical_cert.jpg']},
-];
+import{getAssessmentQueue,assessCase,startAssessment}from'../../../services/managementService';
 
 const statusBadge=s=>{const m={'Pending Assessment':'bg-sky-50 text-sky-700 border-sky-200','Under Assessment':'bg-amber-50 text-amber-700 border-amber-200','In Progress':'bg-blue-50 text-blue-700 border-blue-200','Completed':'bg-green-50 text-green-700 border-green-200','Escalated':'bg-red-50 text-red-700 border-red-200'};return m[s]||'bg-gray-50 text-gray-600 border-gray-200'};
 const priorityBadge=p=>{const m={'High':'bg-red-50 text-red-700 border-red-200','Medium':'bg-amber-50 text-amber-700 border-amber-200','Low':'bg-green-50 text-green-700 border-green-200'};return m[p]||'bg-gray-50 text-gray-600 border-gray-200'};
@@ -89,6 +74,14 @@ const handleSubmit=async(caseNo,formData)=>{
     setSuccessMsg(`Case ${caseNo} assessment submitted.`);setTimeout(()=>setSuccessMsg(''),5000);
     loadQueue();
   }catch(e){setSuccessMsg('');setQueueError(e.message);}
+};
+const handleStartAssessment=async(caseNo)=>{
+  try{
+    await startAssessment(caseNo);
+    setSuccessMsg(`Assessment started for case ${caseNo}.`);setTimeout(()=>setSuccessMsg(''),5000);
+    setWorkspaceRow(r=>r&&r.caseNo===caseNo?{...r,status:'Under Assessment'}:r);
+    await loadQueue();
+  }catch(e){setSuccessMsg('');setQueueError(e.message);throw e;}
 };
 
 const kpis=[
@@ -163,7 +156,7 @@ return(
   </div>
  </div>
 
- <AssessmentWorkspace row={workspaceRow} isOpen={workspaceOpen} onClose={closeWorkspace} onSubmit={handleSubmit}/>
+ <AssessmentWorkspace row={workspaceRow} isOpen={workspaceOpen} onClose={closeWorkspace} onSubmit={handleSubmit} onStartAssessment={handleStartAssessment}/>
 </div>
 );
 }

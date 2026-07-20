@@ -1,24 +1,44 @@
-import React,{useState,useRef}from'react';
-import{CheckCircle,XCircle,AlertTriangle,FileText,MessageSquare,ClipboardList,Upload,X,FolderOpen,SendHorizontal,User,ArrowLeft,ChevronDown,ChevronUp,Copy,Clock,Eye,Trash2,Plus,Download,Building2,Check}from'lucide-react';
+import React,{useState,useRef,useEffect}from'react';
+import{CheckCircle,XCircle,AlertTriangle,FileText,MessageSquare,ClipboardList,Upload,X,FolderOpen,SendHorizontal,User,ArrowLeft,ChevronDown,ChevronUp,Copy,Clock,Eye,Trash2,Plus,Download,Building2,Check,Loader2,PlayCircle}from'lucide-react';
 import ApplicantInfoView from'../../../components/common/ApplicantInfoView';
-import{buildApplicant}from'../../../data/mockApplicantData';
+import{getCaseDetail}from'../../../services/managementService';
 
 const checklistItems=['Identity verification completed','Documents validated','Fingerprint verification reviewed','Interview conducted (if required)','Criminal/immigration check cleared','Eligibility confirmed','Travel history reviewed','Biometric enrollment verified','Medical clearance obtained','Financial proof assessed','Accommodation details confirmed','Security clearance approved'];
 
 const statusBadge=s=>{const m={'Pending Assessment':'bg-sky-50 text-sky-700 border-sky-200','Under Assessment':'bg-amber-50 text-amber-700 border-amber-200','In Progress':'bg-blue-50 text-blue-700 border-blue-200','Completed':'bg-green-50 text-green-700 border-green-200','Escalated':'bg-red-50 text-red-700 border-red-200'};return m[s]||'bg-gray-50 text-gray-600 border-gray-200'};
 
-const existingDocs=[
-  {id:1,name:'Passport Copy.pdf',type:'PDF',date:'12-Jun-2026 09:15',size:'1.2 MB',uploader:'G. Temu'},
-  {id:2,name:'Birth Certificate.pdf',type:'PDF',date:'12-Jun-2026 09:22',size:'0.8 MB',uploader:'G. Temu'},
-  {id:3,name:'Interview Report.pdf',type:'PDF',date:'12-Jun-2026 10:45',size:'2.1 MB',uploader:'J. Otieno'},
-  {id:4,name:'Assessment Summary.pdf',type:'PDF',date:'12-Jun-2026 11:20',size:'1.5 MB',uploader:'G. Temu'},
-];
+// Backend sexId (1=Male, 2=Female) -> label used by ApplicantInfoView.
+const sexLabel=s=>s===1?'Male':s===2?'Female':undefined;
 
-const notesHistory=[
-  {id:1,ts:'12-Jun-2026 10:15 AM',officer:'J. Smith',text:'Initial assessment started. Documents reviewed and applicant identity verified.',recommendation:null},
-  {id:2,ts:'12-Jun-2026 11:05 AM',officer:'J. Smith',text:'Biometric verification confirmed successful. Applicant meets initial eligibility criteria.',recommendation:null},
-  {id:3,ts:'12-Jun-2026 12:30 PM',officer:'A. Mwenda',text:'Recommendation updated: Further verification required due to minor document discrepancy on entry records.',recommendation:'escalate'}
-];
+// Maps a management Case Detail response to the ApplicantInfoView shape. Only the
+// person-summary fields the backend is known to return are populated; the richer
+// address/parents/education sections fill in automatically if the backend
+// includes them under these keys, otherwise ApplicantInfoView renders “—”.
+function mapDetailToApplicant(detail){
+  const p=detail?.person||{};
+  return{
+    fullName:p.fullName,gender:sexLabel(p.sexId),dob:p.dateOfBirth,
+    citizenshipType:p.citizenshipType,nationality:p.nationalityCode,
+    countryOfBirth:p.countryOfBirth,region:p.region,district:p.district,
+    ward:p.ward,villageStreet:p.villageStreet,birthCertificateNo:p.birthCertificateNo,
+    maritalStatus:p.maritalStatus,phone:p.phone,email:p.email,
+    currentAddress:p.currentAddress,permanentSameAsCurrent:p.permanentSameAsCurrent,
+    permanentAddress:p.permanentAddress,father:p.father,mother:p.mother,
+    education:p.education||[],employment:p.employment,emergencyContacts:p.emergencyContacts||[],
+  };
+}
+
+// Normalises whatever document list the case detail carries (field names vary)
+// into the row shape this workspace renders.
+function mapDocuments(detail){
+  return(detail?.documents||[]).map((d,i)=>({
+    id:d.id??d.documentId??i,
+    name:d.name||d.fileName||d.documentType||'Document',
+    date:d.uploadedAt||d.date||'',
+    size:d.size||'',
+    uploader:d.uploadedBy||d.uploader||'',
+  }));
+}
 
 function SectionCard({title,icon,children,defaultOpen=true}){
   const[open,setOpen]=useState(defaultOpen);
@@ -58,7 +78,11 @@ const departmentOptions=[
   'Legal Department'
 ];
 
-export default function AssessmentWorkspace({row,isOpen,onClose,onSubmit}){
+export default function AssessmentWorkspace({row,isOpen,onClose,onSubmit,onStartAssessment}){
+  const[detail,setDetail]=useState(null);
+  const[loadingDetail,setLoadingDetail]=useState(false);
+  const[detailError,setDetailError]=useState('');
+  const[starting,setStarting]=useState(false);
   const[checks,setChecks]=useState(new Array(checklistItems.length).fill(false));
   const[findings,setFindings]=useState('');
   const[notes,setNotes]=useState('');
@@ -71,13 +95,33 @@ export default function AssessmentWorkspace({row,isOpen,onClose,onSubmit}){
   const[confirm,setConfirm]=useState(false);
   const[toast,setToast]=useState('');
   const[activeTab,setActiveTab]=useState('info');
-  const[history,setHistory]=useState(notesHistory);
+  const[history,setHistory]=useState([]);
   const[recAttachments,setRecAttachments]=useState([]);
   const fileRefs=useRef({});
   const recFileRef=useRef({});
   const findingsRef=useRef(null);
 
+  // Load the full case detail (applicant summary, documents, latest records) each
+  // time the workspace opens for a case. Replaces the previous mock applicant.
+  useEffect(()=>{
+    if(!isOpen||!row?.caseNo)return;
+    let cancelled=false;
+    setLoadingDetail(true);setDetailError('');setDetail(null);
+    getCaseDetail(row.caseNo)
+      .then(d=>{if(!cancelled)setDetail(d);})
+      .catch(e=>{if(!cancelled)setDetailError(e.message||'Failed to load case detail.');})
+      .finally(()=>{if(!cancelled)setLoadingDetail(false);});
+    return()=>{cancelled=true;};
+  },[isOpen,row?.caseNo]);
+
   if(!isOpen||!row)return null;
+
+  const startAssessmentNow=async()=>{
+    if(!onStartAssessment)return;
+    setStarting(true);
+    try{await onStartAssessment(row.caseNo);}
+    finally{setStarting(false);}
+  };
 
   const toggle=i=>setChecks(c=>c.map((v,idx)=>idx===i?!v:v));
   const allDone=checks.every(Boolean);
@@ -125,7 +169,8 @@ export default function AssessmentWorkspace({row,isOpen,onClose,onSubmit}){
     setConfirm(false);onClose();
   };
 
-  const applicant=buildApplicant(row);
+  const applicant=mapDetailToApplicant(detail);
+  const existingDocs=mapDocuments(detail);
 
   const tabs=[
     {id:'info',label:'Applicant Info',icon:<User className="h-4 w-4"/>},
@@ -144,6 +189,11 @@ export default function AssessmentWorkspace({row,isOpen,onClose,onSubmit}){
             <div><h2 className="text-base font-bold text-gray-800">Assessment Workspace</h2><p className="text-sm text-gray-400 font-mono">{row.caseNo} / {row.appNo}</p></div>
           </div>
           <div className="flex items-center gap-2">
+            {(row.status||'').toUpperCase().replace(/\s+/g,'_')==='PENDING_ASSESSMENT'&&onStartAssessment&&(
+              <button onClick={startAssessmentNow} disabled={starting} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-icrcs-navy text-white text-xs font-semibold hover:bg-icrcs-navy-light transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                {starting?<Loader2 className="h-3.5 w-3.5 animate-spin"/>:<PlayCircle className="h-3.5 w-3.5"/>}Start Assessment
+              </button>
+            )}
             <span className={`text-xs px-2.5 py-0.5 rounded-full border font-semibold ${statusBadge(row.status)}`}>{row.status}</span>
             <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 transition-colors"><X className="h-4 w-4 text-gray-500"/></button>
           </div>
@@ -161,7 +211,13 @@ export default function AssessmentWorkspace({row,isOpen,onClose,onSubmit}){
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-5 sm:p-6">
-          {activeTab==='info'&&<ApplicantInfoView data={applicant}/>}
+          {activeTab==='info'&&(
+            loadingDetail
+              ?<div className="flex flex-col items-center justify-center py-16 gap-2 text-gray-400"><Loader2 className="h-6 w-6 animate-spin"/><span className="text-sm">Loading applicant details…</span></div>
+              :detailError
+                ?<div className="p-4 rounded-xl bg-red-50 border border-red-100 flex items-center gap-2"><XCircle className="h-4 w-4 text-red-600 shrink-0"/><span className="text-sm font-medium text-red-700">{detailError}</span></div>
+                :<ApplicantInfoView data={applicant}/>
+          )}
 
           {activeTab==='attachments'&&(
             <div className="flex flex-col lg:flex-row gap-5">

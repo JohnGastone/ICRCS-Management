@@ -3,6 +3,26 @@ import { API_BASE_URL, API_ENDPOINTS, ROLE_MAP } from '../../config/apiConfig';
 
 const AuthContext = createContext(null);
 
+// True if the access token is a JWT that hasn't expired. Opaque/non-JWT tokens
+// (or tokens without an exp claim) can't be judged here, so we defer to the API
+// layer (a 401 triggers refresh/logout) and treat them as live.
+function isTokenLive(token) {
+  if (!token) return false;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    if (!payload.exp) return true;
+    return payload.exp * 1000 > Date.now();
+  } catch {
+    return true;
+  }
+}
+
+function clearStoredSession() {
+  localStorage.removeItem('icrcs_user');
+  localStorage.removeItem('officer_token');
+  localStorage.removeItem('officer_refresh_token');
+}
+
 function extractRole(roles = []) {
   for (const r of roles) {
     const code = typeof r === 'object' ? r.RoleCode : r;
@@ -14,7 +34,17 @@ function extractRole(roles = []) {
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem('icrcs_user');
-    return saved ? JSON.parse(saved) : null;
+    const token = localStorage.getItem('officer_token');
+    const refreshToken = localStorage.getItem('officer_refresh_token');
+    // Only trust a persisted user when it's backed by a usable session: a live
+    // access token, or a refresh token the API layer can exchange on the first
+    // 401. A stored user without either is stale (or hand-seeded mock data) — we
+    // clear it so the app never appears logged-in without a real backend login.
+    if (saved && (isTokenLive(token) || refreshToken)) {
+      try { return JSON.parse(saved); } catch { /* fall through to clear */ }
+    }
+    if (saved || token || refreshToken) clearStoredSession();
+    return null;
   });
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError]     = useState(null);
@@ -81,9 +111,7 @@ export function AuthProvider({ children }) {
       }).catch(() => {}); // ignore network/abort; local session is cleared regardless
     }
     setUser(null);
-    localStorage.removeItem('icrcs_user');
-    localStorage.removeItem('officer_token');
-    localStorage.removeItem('officer_refresh_token');
+    clearStoredSession();
   }, []);
 
   const value = {

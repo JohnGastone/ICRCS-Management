@@ -2,27 +2,14 @@ import React,{useState}from'react';
 import{ClipboardCheck,CheckCircle,XCircle,AlertTriangle,RotateCcw,Search,ChevronDown,ArrowUpDown,FolderOpen,X,Building2}from'lucide-react';
 import ApproveDecisionWorkspace from'../../statusDetermination/components/ApproveDecisionWorkspace';
 
-const mockCases=[
-{caseNo:'ICRCS-ESC-2026-000120',appNo:'APP-2026-000145',fullName:'John Michael Doe',nationality:'Kenyan',gender:'Male',dob:'10-Jan-1990',passportNo:'A12345678',status:'Pending Resolution',priority:'High',assignedDate:'12-Jun-2026',officer:'Grace Temu',decision:'Escalate',escalatedTo:'Citizenship department'},
-{caseNo:'ICRCS-ESC-2026-000119',appNo:'APP-2026-000146',fullName:'Amina Hassan',nationality:'Tanzanian',gender:'Female',dob:'15-Mar-1988',passportNo:'T98765432',status:'Pending Resolution',priority:'High',assignedDate:'11-Jun-2026',officer:'James Otieno',decision:'Escalate',escalatedTo:'Border Management and Control'},
-{caseNo:'ICRCS-ESC-2026-000118',appNo:'APP-2026-000147',fullName:'Robert Kimaro',nationality:'Kenyan',gender:'Male',dob:'22-Jul-1992',passportNo:'A87654321',status:'Forwarded to Legal',priority:'Medium',assignedDate:'10-Jun-2026',officer:'Grace Temu',decision:'Escalate',escalatedTo:'Legal Department'},
-{caseNo:'ICRCS-ESC-2026-000117',appNo:'APP-2026-000148',fullName:'Halima Said',nationality:'Rwandan',gender:'Female',dob:'05-Nov-1985',passportNo:'R11223344',status:'Pending Resolution',priority:'Low',assignedDate:'09-Jun-2026',officer:'Juma Kipanya',decision:'Escalate',escalatedTo:'Citizenship department'},
-{caseNo:'ICRCS-ESC-2026-000116',appNo:'APP-2026-000149',fullName:'Michael Bwire',nationality:'Ugandan',gender:'Male',dob:'18-Sep-1995',passportNo:'U55667788',status:'Returned to Assessment',priority:'Medium',assignedDate:'08-Jun-2026',officer:'James Otieno',decision:'More Info'},
-{caseNo:'ICRCS-ESC-2026-000115',appNo:'APP-2026-000150',fullName:'Fatma Juma',nationality:'Burundian',gender:'Female',dob:'30-Jan-1990',passportNo:'B99887766',status:'Resolved',priority:'High',assignedDate:'07-Jun-2026',officer:'Grace Temu',decision:'Escalate',escalatedTo:'Legal Department'},
-{caseNo:'ICRCS-ESC-2026-000114',appNo:'APP-2026-000151',fullName:'Peter Ochieng',nationality:'Kenyan',gender:'Male',dob:'12-Apr-1987',passportNo:'A33445566',status:'Resolved',priority:'Medium',assignedDate:'06-Jun-2026',officer:'Juma Kipanya',decision:'Escalate',escalatedTo:'Border Management and Control'},
-{caseNo:'ICRCS-ESC-2026-000113',appNo:'APP-2026-000152',fullName:'Joyce Mwende',nationality:'Tanzanian',gender:'Female',dob:'25-Dec-1993',passportNo:'T77889900',status:'Pending Resolution',priority:'Low',assignedDate:'05-Jun-2026',officer:'Grace Temu',decision:'Escalate',escalatedTo:'Citizenship department'},
-{caseNo:'ICRCS-ESC-2026-000112',appNo:'APP-2026-000153',fullName:'Daniel Ndayisaba',nationality:'Burundian',gender:'Male',dob:'08-Jun-1991',passportNo:'B22334455',status:'Forwarded to Legal',priority:'High',assignedDate:'04-Jun-2026',officer:'James Otieno',decision:'Escalate',escalatedTo:'Legal Department'},
-{caseNo:'ICRCS-ESC-2026-000111',appNo:'APP-2026-000154',fullName:'Grace Akello',nationality:'Ugandan',gender:'Female',dob:'14-Feb-1989',passportNo:'U66778899',status:'Pending Resolution',priority:'Medium',assignedDate:'03-Jun-2026',officer:'Juma Kipanya',decision:'Escalate',escalatedTo:'Border Management and Control'},
-{caseNo:'ICRCS-ESC-2026-000110',appNo:'APP-2026-000155',fullName:'Samuel Kagame',nationality:'Rwandan',gender:'Male',dob:'19-Oct-1994',passportNo:'R44556677',status:'Resolved',priority:'Low',assignedDate:'02-Jun-2026',officer:'Grace Temu',decision:'Escalate',escalatedTo:'Citizenship department'},
-{caseNo:'ICRCS-ESC-2026-000109',appNo:'APP-2026-000156',fullName:'Esther Wanjiku',nationality:'Kenyan',gender:'Female',dob:'03-May-1986',passportNo:'A55667788',status:'Returned to Assessment',priority:'High',assignedDate:'01-Jun-2026',officer:'James Otieno',decision:'More Info'},
-];
-
 const statusBadge=s=>{const m={'Pending Resolution':'bg-sky-50 text-sky-700 border-sky-200','Resolved':'bg-green-50 text-green-700 border-green-200','Returned to Assessment':'bg-amber-50 text-amber-700 border-amber-200','Forwarded to Legal':'bg-purple-50 text-purple-700 border-purple-200'};return m[s]||'bg-gray-50 text-gray-600 border-gray-200'};
 const priorityBadge=p=>{const m={'High':'bg-red-50 text-red-700 border-red-200','Medium':'bg-amber-50 text-amber-700 border-amber-200','Low':'bg-green-50 text-green-700 border-green-200'};return m[p]||'bg-gray-50 text-gray-600 border-gray-200'};
 const decisionBadge=d=>{const m={'Escalate':'bg-purple-50 text-purple-700 border-purple-200','More Info':'bg-amber-50 text-amber-700 border-amber-200'};return m[d]||'bg-gray-50 text-gray-600 border-gray-200'};
 
 export default function EscalateCase(){
-const[cases,setCases]=useState(mockCases);
+// Escalation has no backend endpoint yet, so the queue starts empty. Wire a real
+// fetch here (like the assessment/approval queues) once the endpoint exists.
+const[cases,setCases]=useState([]);
 const[search,setSearch]=useState('');
 const[statusFilter,setStatusFilter]=useState('All');
 const[priorityFilter,setPriorityFilter]=useState('All');

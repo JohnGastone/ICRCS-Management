@@ -35,7 +35,12 @@ export default function InternalLayout({ children }) {
     closeProfile();
   }, [location.pathname, closeProfile]);
 
-  const sidebarMenu = menuItems.filter(item => item.roles ? item.roles.includes(user?.role) : true);
+  // INTERIM: show every internal tab to any authenticated officer. Role→menu
+  // gating is disabled until the backend's PermissionsByModule model is mapped to
+  // roles in AuthProvider; the backend still enforces access on each API call.
+  // Restore `menuItems.filter(item => item.roles ? item.roles.includes(user?.role) : true)`
+  // (and the guard in ProtectedRoute) once that mapping exists.
+  const sidebarMenu = menuItems;
   const activeMenu = sidebarMenu.find(m => location.pathname === m.path || (m.children && m.children.some(c => location.pathname === c.path)) || location.pathname.startsWith(m.path + '/')) || sidebarMenu[0];
 
   const toggleMenu = (path) => {

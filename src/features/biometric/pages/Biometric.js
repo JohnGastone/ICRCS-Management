@@ -3,6 +3,7 @@ import { getEnrollmentQueue, getCaseBySubject, enrollCase } from '../../../servi
 import { Search, Globe, AlertCircle, Loader2, Eye, Camera, CheckCircle, X, XCircle, Fingerprint, ChevronDown, Filter, FileCheck, SendHorizontal, StickyNote, Upload, Pen, RefreshCw, AlertTriangle, Sun, Image, User, FolderOpen, ClipboardList, MessageSquare, ArrowLeft, Download, FileText, Clock, ArrowUpDown } from 'lucide-react';
 import ApplicantInfoView from '../../../components/common/ApplicantInfoView';
 import { buildApplicant } from '../../../data/mockApplicantData';
+import { useAuth } from '../../../app/providers/AuthProvider';
 import {
   startCapture,
   startGroupCapture,
@@ -26,36 +27,6 @@ const GROUP_FINGERS = {
   right: [{ hand: 'right', name: 'index' }, { hand: 'right', name: 'middle' }, { hand: 'right', name: 'ring' }, { hand: 'right', name: 'pinky' }],
 };
 const GROUP_LABELS = { left: 'Left Hand', thumbs: 'Thumbs', right: 'Right Hand' };
-
-const mockPortalApps = {
-  'APP-2026-000145': {
-    appNo: 'APP-2026-000145', appType: 'Status Determination', submissionDate: '12-Jun-2026', currentStatus: 'Submitted',
-    fullName: 'John Michael Doe', gender: 'Male', dob: '10-Jan-1990', nationality: 'Kenyan',
-    passportNo: 'A12345678', countryOfIssue: 'Kenya', entryPoint: 'Namanga', dateOfEntry: '01-Jun-2026',
-    attachments: ['Passport Copy', 'Birth Certificate', 'Supporting Letter']
-  },
-  'APP-2026-000146': {
-    appNo: 'APP-2026-000146', appType: 'Resident Permit', submissionDate: '11-Jun-2026', currentStatus: 'Submitted',
-    fullName: 'Sarah Jane Kimani', gender: 'Female', dob: '05-Mar-1985', nationality: 'Ugandan',
-    passportNo: 'B87654321', countryOfIssue: 'Uganda', entryPoint: 'Mutukula', dateOfEntry: '28-May-2026',
-    attachments: ['Passport Copy', 'Residency Proof']
-  },
-};
-
-const initialQueue = [
-  { caseNo: 'ICRCS-BIO-2026-000245', appNo: 'APP-2026-000143', fullName: 'Amina Hassan', nationality: 'Tanzanian', status: 'Pending Biometric Capture', officer: 'Grace Temu', dateReceived: '10-Jun-2026' },
-  { caseNo: 'ICRCS-BIO-2026-000244', appNo: 'APP-2026-000144', fullName: 'Robert Kimaro', nationality: 'Kenyan', status: 'Biometric In Progress', officer: 'James Otieno', dateReceived: '09-Jun-2026' },
-  { caseNo: 'ICRCS-BIO-2026-000243', appNo: 'APP-2026-000142', fullName: 'Halima Said', nationality: 'Rwandan', status: 'Biometric Enrollment Completed', officer: 'Grace Temu', dateReceived: '08-Jun-2026' },
-  { caseNo: 'ICRCS-BIO-2026-000242', appNo: 'APP-2026-000141', fullName: 'Michael Bwire', nationality: 'Ugandan', status: 'Forwarded to Assessment', officer: 'James Otieno', dateReceived: '07-Jun-2026' },
-  { caseNo: 'ICRCS-BIO-2026-000241', appNo: 'APP-2026-000140', fullName: 'Fatma Juma', nationality: 'Burundian', status: 'Pending Biometric Capture', officer: 'Juma Kipanya', dateReceived: '06-Jun-2026' },
-  { caseNo: 'ICRCS-BIO-2026-000240', appNo: 'APP-2026-000139', fullName: 'Peter Ochieng', nationality: 'Kenyan', status: 'Pending Biometric Capture', officer: 'Grace Temu', dateReceived: '05-Jun-2026' },
-  { caseNo: 'ICRCS-BIO-2026-000239', appNo: 'APP-2026-000138', fullName: 'Joyce Mwende', nationality: 'Tanzanian', status: 'Biometric In Progress', officer: 'James Otieno', dateReceived: '04-Jun-2026' },
-  { caseNo: 'ICRCS-BIO-2026-000238', appNo: 'APP-2026-000137', fullName: 'Daniel Ndayisaba', nationality: 'Burundian', status: 'Biometric Enrollment Completed', officer: 'Juma Kipanya', dateReceived: '03-Jun-2026' },
-  { caseNo: 'ICRCS-BIO-2026-000237', appNo: 'APP-2026-000136', fullName: 'Grace Akello', nationality: 'Ugandan', status: 'Forwarded to Assessment', officer: 'Grace Temu', dateReceived: '02-Jun-2026' },
-  { caseNo: 'ICRCS-BIO-2026-000236', appNo: 'APP-2026-000135', fullName: 'Samuel Kagame', nationality: 'Rwandan', status: 'Pending Biometric Capture', officer: 'James Otieno', dateReceived: '01-Jun-2026' },
-  { caseNo: 'ICRCS-BIO-2026-000235', appNo: 'APP-2026-000134', fullName: 'Esther Wanjiku', nationality: 'Kenyan', status: 'Biometric In Progress', officer: 'Juma Kipanya', dateReceived: '31-May-2026' },
-  { caseNo: 'ICRCS-BIO-2026-000234', appNo: 'APP-2026-000133', fullName: 'Charles Mugisha', nationality: 'Ugandan', status: 'Biometric Enrollment Completed', officer: 'Grace Temu', dateReceived: '30-May-2026' },
-];
 
 const viewNotesHistory = [
   {id:1,ts:'12-Jun-2026 10:15 AM',officer:'J. Smith',text:'Initial assessment started. Documents reviewed and applicant identity verified.',recommendation:null},
@@ -93,6 +64,7 @@ const buildDetails = (row) => ({
 });
 
 export default function Biometric() {
+  const { user } = useAuth();
   const [appNumber, setAppNumber] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -231,8 +203,8 @@ export default function Biometric() {
     const dateReceived = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
     const newItem = {
       caseNo, appNo: fetchedApp.appNo, fullName: fetchedApp.fullName, nationality: fetchedApp.nationality,
-      status: 'Pending Biometric Capture', officer: 'Officer', dateReceived,
-      details: { ...fetchedApp, caseNo, currentStatus: 'Pending Biometric Capture', officer: 'Officer', dateReceived }
+      status: 'Pending Biometric Capture', officer: user?.name || '', dateReceived,
+      details: { ...fetchedApp, caseNo, currentStatus: 'Pending Biometric Capture', officer: user?.name || '', dateReceived }
     };
     setQueue(prev => [newItem, ...prev]);
     closeReviewModal();
@@ -499,7 +471,7 @@ export default function Biometric() {
   };
 
   const addAuditEntry = (action) => {
-    const entry = { action, officer: 'Officer', timestamp: new Date().toLocaleString('en-GB'), caseNo: captureTarget?.caseNo || '', appNo: captureTarget?.appNo || '' };
+    const entry = { action, officer: user?.name || '', timestamp: new Date().toLocaleString('en-GB'), caseNo: captureTarget?.caseNo || '', appNo: captureTarget?.appNo || '' };
     setAuditLog(prev => [entry, ...prev]);
     console.log('[Audit]', entry);
   };
@@ -859,14 +831,6 @@ export default function Biometric() {
             </button>
           </div>
         </form>
-        <div className="mt-5 p-4 rounded-xl bg-gray-50 border border-gray-100">
-          <p className="text-xs text-gray-500 font-medium mb-2">Try these demo application numbers:</p>
-          <div className="flex flex-wrap gap-2">
-            {Object.keys(mockPortalApps).map((key) => (
-              <button key={key} onClick={() => { setAppNumber(key); setError(''); clearSuccess(); }} className="px-3 py-1.5 rounded-lg text-xs font-medium border bg-white text-gray-600 border-gray-200 hover:border-icrcs-navy/30 hover:text-icrcs-navy transition-colors">{key}</button>
-            ))}
-          </div>
-        </div>
       </div>
 
       {/* Review Modal */}

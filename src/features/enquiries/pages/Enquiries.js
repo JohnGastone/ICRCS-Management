@@ -25,59 +25,6 @@ export default function Enquiries() {
     { key: 'dob', label: 'Date of Birth' },
   ];
 
-  const mockResult = {
-    subjectId: 'SUB-2025-004291',
-    name: 'Amina Hassan',
-    dob: '1992-03-15',
-    nationality: 'Tanzania',
-    gender: 'Female',
-    fingerprintNo: 'FP-TZ-829103',
-    nin: '19920315-12345-67890',
-    passportNo: 'TZ0123456',
-    status: 'Citizen by Descent',
-    dateDetermined: '2025-05-20',
-    caseRef: 'ISD-2025-001',
-    biometricVerified: true,
-    email: 'amina.hassan@email.co.tz',
-    phone: '+255 712 345 678',
-    address: 'Sinza, Dar es Salaam',
-    photoUrl: null,
-    documents: [
-      { type: 'Birth Certificate', ref: 'BC-1992-0315-001', status: 'Verified', issued: '1992-03-20', place: 'Ilala Municipal', officer: 'Juma Kipanya' },
-      { type: 'National ID', ref: 'NIN-19920315-12345', status: 'Verified', issued: '2015-08-12', place: 'NIDA HQ, Dodoma', officer: 'Grace Temu' },
-      { type: 'Passport', ref: 'TZ0123456', status: 'Verified', issued: '2020-01-15', place: 'Immigration HQ, DSM', officer: 'Dr. Ramadhani' },
-    ],
-    comments: [
-      { id: 1, officer: 'Grace Temu', role: 'Assessor', date: '2025-05-18', text: 'Applicant provided sufficient evidence of parental citizenship. All supporting documents verified and cross-checked against national registry. Recommend approval.' },
-      { id: 2, officer: 'Dr. Ramadhani', role: 'Approver', date: '2025-05-20', text: 'Reviewed assessment findings. Biometric match confirmed. Status determination: Citizen by Descent. Case closed.' },
-    ],
-    history: [
-      { date: '2025-05-20', action: 'Status Determined: Citizen by Descent', officer: 'Dr. Ramadhani', type: 'determination' },
-      { date: '2025-05-18', action: 'Recommendation: Approve', officer: 'Grace Temu', type: 'approval' },
-      { date: '2025-05-10', action: 'Assessment Completed', officer: 'Grace Temu', type: 'assessment' },
-      { date: '2025-05-08', action: 'Biometric Enrollment', officer: 'Juma Kipanya', type: 'biometric' },
-      { date: '2025-05-05', action: 'Case Registered', officer: 'Juma Kipanya', type: 'registration' },
-    ],
-    checkedItems: {
-      assessor: [
-        { label: 'Identity Verification', status: 'checked', date: '2025-05-10', notes: 'Verified against NIDA database' },
-        { label: 'Parental Citizenship Evidence', status: 'checked', date: '2025-05-10', notes: 'Birth certificates and parent NINs verified' },
-        { label: 'Biometric Data Quality', status: 'checked', date: '2025-05-08', notes: 'Clear fingerprints and photo captured' },
-        { label: 'Supporting Documents Complete', status: 'checked', date: '2025-05-10', notes: 'All required documents submitted' },
-        { label: 'Criminal Record Check', status: 'checked', date: '2025-05-09', notes: 'No record found in national database' },
-        { label: 'Residence Verification', status: 'unchecked', date: '-', notes: 'Not applicable — Citizen by Descent' },
-      ],
-      approver: [
-        { label: 'Assessor Report Reviewed', status: 'checked', date: '2025-05-18', notes: 'All findings consistent with evidence' },
-        { label: 'Biometric Match Confirmed', status: 'checked', date: '2025-05-20', notes: 'Cross-verified with NIDA biometric system' },
-        { label: 'Legal Framework Compliance', status: 'checked', date: '2025-05-20', notes: 'Meets Section 4(2) Citizenship Act requirements' },
-        { label: 'Flagged Cases Review', status: 'checked', date: '2025-05-19', notes: 'No prior flags or duplicate applications' },
-        { label: 'Final Approval Signature', status: 'checked', date: '2025-05-20', notes: 'Electronically signed and recorded' },
-        { label: 'OIG Referral Required', status: 'unchecked', date: '-', notes: 'Not applicable' },
-      ]
-    }
-  };
-
   const handleSearch = async (e) => {
     e.preventDefault();
     if (!query.trim()) return;
