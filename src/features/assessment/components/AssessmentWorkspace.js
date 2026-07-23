@@ -1,42 +1,23 @@
 import React,{useState,useRef,useEffect}from'react';
 import{CheckCircle,XCircle,AlertTriangle,FileText,MessageSquare,ClipboardList,Upload,X,FolderOpen,SendHorizontal,User,ArrowLeft,ChevronDown,ChevronUp,Copy,Clock,Eye,Trash2,Plus,Download,Building2,Check,Loader2,PlayCircle}from'lucide-react';
 import ApplicantInfoView from'../../../components/common/ApplicantInfoView';
-import{getCaseDetail}from'../../../services/managementService';
+import{getApplicantReview}from'../../../services/managementService';
 
 const checklistItems=['Identity verification completed','Documents validated','Fingerprint verification reviewed','Interview conducted (if required)','Criminal/immigration check cleared','Eligibility confirmed','Travel history reviewed','Biometric enrollment verified','Medical clearance obtained','Financial proof assessed','Accommodation details confirmed','Security clearance approved'];
 
 const statusBadge=s=>{const m={'Pending Assessment':'bg-sky-50 text-sky-700 border-sky-200','Under Assessment':'bg-amber-50 text-amber-700 border-amber-200','In Progress':'bg-blue-50 text-blue-700 border-blue-200','Completed':'bg-green-50 text-green-700 border-green-200','Escalated':'bg-red-50 text-red-700 border-red-200'};return m[s]||'bg-gray-50 text-gray-600 border-gray-200'};
 
-// Backend sexId (1=Male, 2=Female) -> label used by ApplicantInfoView.
-const sexLabel=s=>s===1?'Male':s===2?'Female':undefined;
+const mimeExt=m=>m?.includes('pdf')?'pdf':m?.startsWith('image/')?(m.split('/')[1]||'img'):'file';
 
-// Maps a management Case Detail response to the ApplicantInfoView shape. Only the
-// person-summary fields the backend is known to return are populated; the richer
-// address/parents/education sections fill in automatically if the backend
-// includes them under these keys, otherwise ApplicantInfoView renders “—”.
-function mapDetailToApplicant(detail){
-  const p=detail?.person||{};
-  return{
-    fullName:p.fullName,gender:sexLabel(p.sexId),dob:p.dateOfBirth,
-    citizenshipType:p.citizenshipType,nationality:p.nationalityCode,
-    countryOfBirth:p.countryOfBirth,region:p.region,district:p.district,
-    ward:p.ward,villageStreet:p.villageStreet,birthCertificateNo:p.birthCertificateNo,
-    maritalStatus:p.maritalStatus,phone:p.phone,email:p.email,
-    currentAddress:p.currentAddress,permanentSameAsCurrent:p.permanentSameAsCurrent,
-    permanentAddress:p.permanentAddress,father:p.father,mother:p.mother,
-    education:p.education||[],employment:p.employment,emergencyContacts:p.emergencyContacts||[],
-  };
-}
-
-// Normalises whatever document list the case detail carries (field names vary)
-// into the row shape this workspace renders.
-function mapDocuments(detail){
-  return(detail?.documents||[]).map((d,i)=>({
-    id:d.id??d.documentId??i,
-    name:d.name||d.fileName||d.documentType||'Document',
-    date:d.uploadedAt||d.date||'',
-    size:d.size||'',
-    uploader:d.uploadedBy||d.uploader||'',
+// Real applicant attachments (attachmentType, fileUrl, mimeType) -> the row shape
+// this workspace's Attachments tab renders.
+function mapAttachments(review){
+  return(review?.attachments||[]).map((a,i)=>({
+    id:i+1,
+    name:`${a.attachmentType||'Document'}.${mimeExt(a.mimeType)}`,
+    url:a.fileUrl,
+    mimeType:a.mimeType||'application/pdf',
+    date:'',size:'',uploader:'',
   }));
 }
 
@@ -107,7 +88,7 @@ export default function AssessmentWorkspace({row,isOpen,onClose,onSubmit,onStart
     if(!isOpen||!row?.caseNo)return;
     let cancelled=false;
     setLoadingDetail(true);setDetailError('');setDetail(null);
-    getCaseDetail(row.caseNo)
+    getApplicantReview(row.caseNo)
       .then(d=>{if(!cancelled)setDetail(d);})
       .catch(e=>{if(!cancelled)setDetailError(e.message||'Failed to load case detail.');})
       .finally(()=>{if(!cancelled)setLoadingDetail(false);});
@@ -169,8 +150,8 @@ export default function AssessmentWorkspace({row,isOpen,onClose,onSubmit,onStart
     setConfirm(false);onClose();
   };
 
-  const applicant=mapDetailToApplicant(detail);
-  const existingDocs=mapDocuments(detail);
+  const applicant=detail;
+  const existingDocs=mapAttachments(detail);
 
   const tabs=[
     {id:'info',label:'Applicant Info',icon:<User className="h-4 w-4"/>},
@@ -181,7 +162,7 @@ export default function AssessmentWorkspace({row,isOpen,onClose,onSubmit,onStart
 
   return(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-0 md:p-4">
-      <div className="bg-white w-full h-full md:w-[85%] md:h-[90vh] lg:w-[75%] lg:max-w-[1100px] lg:h-auto lg:max-h-[85vh] rounded-none md:rounded-2xl border border-gray-200 shadow-2xl flex flex-col overflow-hidden">
+      <div className="bg-white w-full h-full md:w-[85%] md:h-[90vh] lg:w-[88%] lg:max-w-[90rem] lg:h-auto lg:max-h-[85vh] rounded-none md:rounded-2xl border border-gray-200 shadow-2xl flex flex-col overflow-hidden">
         {/* Header */}
         <div className="p-5 sm:p-6 border-b border-gray-100 flex items-center justify-between shrink-0 bg-white z-10">
           <div className="flex items-center gap-3">
@@ -232,10 +213,10 @@ export default function AssessmentWorkspace({row,isOpen,onClose,onSubmit,onStart
                     return(
                       <div key={d.id} className="flex items-center justify-between gap-2 p-3 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-gray-50 transition-colors">
                         <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="h-9 w-9 rounded-lg bg-red-50 flex items-center justify-center shrink-0"><span className="text-[9px] font-bold text-red-600 uppercase">{ext}</span></div>
+                          <div className="h-9 w-9 rounded-lg bg-red-50 flex items-center justify-center shrink-0"><span className="text-[0.5625rem] font-bold text-red-600 uppercase">{ext}</span></div>
                           <div className="min-w-0">
                             <div className="text-xs font-medium text-gray-700 truncate">{d.name}</div>
-                            <div className="text-[10px] text-gray-400">{d.size} · {d.date} · {d.uploader}</div>
+                            <div className="text-[0.625rem] text-gray-400">{d.size} · {d.date} · {d.uploader}</div>
                           </div>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
@@ -255,10 +236,10 @@ export default function AssessmentWorkspace({row,isOpen,onClose,onSubmit,onStart
                         return(
                           <div key={d.id} className="flex items-center justify-between gap-2 p-3 rounded-xl border border-dashed border-green-300 bg-green-50/30">
                             <div className="flex items-center gap-2.5 min-w-0">
-                              <div className="h-9 w-9 rounded-lg bg-green-50 flex items-center justify-center shrink-0"><span className="text-[9px] font-bold text-green-600 uppercase">{ext||'PDF'}</span></div>
+                              <div className="h-9 w-9 rounded-lg bg-green-50 flex items-center justify-center shrink-0"><span className="text-[0.5625rem] font-bold text-green-600 uppercase">{ext||'PDF'}</span></div>
                               <div className="min-w-0">
                                 <div className="text-xs font-medium text-gray-700 truncate">{d.name||'New Document'}</div>
-                                <div className="text-[10px] text-green-600">{d.status==='ready'?'Ready':'Waiting for upload'}</div>
+                                <div className="text-[0.625rem] text-green-600">{d.status==='ready'?'Ready':'Waiting for upload'}</div>
                               </div>
                             </div>
                             <div className="flex items-center gap-1 shrink-0">
@@ -283,7 +264,7 @@ export default function AssessmentWorkspace({row,isOpen,onClose,onSubmit,onStart
                   <button onClick={()=>fileRefs.current['new']?.click()} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-icrcs-navy text-white text-sm font-semibold hover:bg-icrcs-navy-light transition-colors shadow-sm">
                     <Upload className="h-4 w-4"/>Upload Document
                   </button>
-                  <p className="text-[11px] text-gray-400 mt-2">Supported: PDF only · Max 5 MB per file</p>
+                  <p className="text-[0.6875rem] text-gray-400 mt-2">Supported: PDF only · Max 5 MB per file</p>
                 </div>
               </div>
               <div className="lg:w-[45%] space-y-4">
@@ -371,12 +352,12 @@ export default function AssessmentWorkspace({row,isOpen,onClose,onSubmit,onStart
                         return(
                           <div key={d.id} className="flex items-center justify-between gap-2 p-2.5 rounded-xl border border-gray-100 bg-gray-50/50">
                             <div className="flex items-center gap-2 min-w-0">
-                              {d.status==='ready'?<><div className="h-7 w-7 rounded-md bg-green-50 flex items-center justify-center shrink-0"><span className="text-[8px] font-bold text-green-600 uppercase">{ext}</span></div><span className="text-xs text-gray-700 truncate">{d.name}</span><span className="text-[10px] text-green-600 shrink-0">Ready</span></>:<><div className="h-7 w-7 rounded-md bg-gray-100 flex items-center justify-center shrink-0"><FileText className="h-3 w-3 text-gray-400"/></div><span className="text-xs text-gray-400">No file selected</span></>}
+                              {d.status==='ready'?<><div className="h-7 w-7 rounded-md bg-green-50 flex items-center justify-center shrink-0"><span className="text-[0.5rem] font-bold text-green-600 uppercase">{ext}</span></div><span className="text-xs text-gray-700 truncate">{d.name}</span><span className="text-[0.625rem] text-green-600 shrink-0">Ready</span></>:<><div className="h-7 w-7 rounded-md bg-gray-100 flex items-center justify-center shrink-0"><FileText className="h-3 w-3 text-gray-400"/></div><span className="text-xs text-gray-400">No file selected</span></>}
                             </div>
                             <div className="flex items-center gap-1 shrink-0">
                               {d.status==='pending'&&(<>
                                 <input type="file" accept=".pdf" ref={el=>{if(el)recFileRef.current[d.id]=el;}} onChange={e=>handleRecAttachmentUpload(d.id,e)} className="hidden"/>
-                                <button onClick={()=>recFileRef.current[d.id]?.click()} className="px-2 py-1 rounded-lg border border-gray-200 text-[10px] font-medium text-gray-500 hover:bg-white transition-colors">Choose</button>
+                                <button onClick={()=>recFileRef.current[d.id]?.click()} className="px-2 py-1 rounded-lg border border-gray-200 text-[0.625rem] font-medium text-gray-500 hover:bg-white transition-colors">Choose</button>
                               </>)}
                               <button onClick={()=>removeRecAttachment(d.id)} className="p-1 rounded hover:bg-white text-gray-400 hover:text-red-500 transition-colors"><Trash2 className="h-3 w-3"/></button>
                             </div>

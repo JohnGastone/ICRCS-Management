@@ -162,7 +162,7 @@ export default function ApproveDecisionWorkspace({row,isOpen,onClose,onSubmit}){
     setReviewData(null);setApplicantData(null);setApplicantError('');setLoadingApplicant(true);
     getApplicantReview(row.caseNo)
       .then(review=>{
-        if(review){setReviewData(review);setApplicantData(mapReviewToApplicant(review));}
+        if(review){setReviewData(review);setApplicantData(review);}
         else setApplicantError('No applicant data returned.');
       })
       .catch(err=>{
@@ -243,7 +243,7 @@ export default function ApproveDecisionWorkspace({row,isOpen,onClose,onSubmit}){
 
   return(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-0 md:p-4">
-      <div className="bg-white w-full h-full md:w-[85%] md:h-[90vh] lg:w-[75%] lg:max-w-[1100px] lg:h-auto lg:max-h-[85vh] rounded-none md:rounded-2xl border border-gray-200 shadow-2xl flex flex-col overflow-hidden">
+      <div className="bg-white w-full h-full md:w-[85%] md:h-[90vh] lg:w-[88%] lg:max-w-[90rem] lg:h-auto lg:max-h-[85vh] rounded-none md:rounded-2xl border border-gray-200 shadow-2xl flex flex-col overflow-hidden">
         {/* Header */}
         <div className="p-5 sm:p-6 border-b border-gray-100 flex items-center justify-between shrink-0 bg-white z-10">
           <div className="flex items-center gap-3">
@@ -299,11 +299,11 @@ export default function ApproveDecisionWorkspace({row,isOpen,onClose,onSubmit}){
                     <div key={d.id} className="flex items-center justify-between gap-2 p-3 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-gray-50 transition-colors">
                       <div className="flex items-center gap-2.5 min-w-0">
                         <div className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${d.isImage?'bg-blue-50':'bg-red-50'}`}>
-                          <span className={`text-[9px] font-bold uppercase ${d.isImage?'text-blue-600':'text-red-600'}`}>{d.ext}</span>
+                          <span className={`text-[0.5625rem] font-bold uppercase ${d.isImage?'text-blue-600':'text-red-600'}`}>{d.ext}</span>
                         </div>
                         <div className="min-w-0">
                           <div className="text-xs font-medium text-gray-700 truncate">{d.name}</div>
-                          <div className="text-[10px] text-gray-400">{d.attachmentType}</div>
+                          <div className="text-[0.625rem] text-gray-400">{d.attachmentType}</div>
                         </div>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
@@ -322,10 +322,10 @@ export default function ApproveDecisionWorkspace({row,isOpen,onClose,onSubmit}){
                         return(
                           <div key={d.id} className="flex items-center justify-between gap-2 p-3 rounded-xl border border-dashed border-green-300 bg-green-50/30">
                             <div className="flex items-center gap-2.5 min-w-0">
-                              <div className="h-9 w-9 rounded-lg bg-green-50 flex items-center justify-center shrink-0"><span className="text-[9px] font-bold text-green-600 uppercase">{ext||'PDF'}</span></div>
+                              <div className="h-9 w-9 rounded-lg bg-green-50 flex items-center justify-center shrink-0"><span className="text-[0.5625rem] font-bold text-green-600 uppercase">{ext||'PDF'}</span></div>
                               <div className="min-w-0">
                                 <div className="text-xs font-medium text-gray-700 truncate">{d.name||'New Document'}</div>
-                                <div className="text-[10px] text-green-600">{d.status==='ready'?'Ready':'Waiting for upload'}</div>
+                                <div className="text-[0.625rem] text-green-600">{d.status==='ready'?'Ready':'Waiting for upload'}</div>
                               </div>
                             </div>
                             <div className="flex items-center gap-1 shrink-0">
@@ -350,7 +350,7 @@ export default function ApproveDecisionWorkspace({row,isOpen,onClose,onSubmit}){
                   <button onClick={()=>fileRefs.current['new']?.click()} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-icrcs-navy text-white text-sm font-semibold hover:bg-icrcs-navy-light transition-colors shadow-sm">
                     <Upload className="h-4 w-4"/>Upload Document
                   </button>
-                  <p className="text-[11px] text-gray-400 mt-2">Supported: PDF only &middot; Max 5 MB per file</p>
+                  <p className="text-[0.6875rem] text-gray-400 mt-2">Supported: PDF only &middot; Max 5 MB per file</p>
                 </div>
               </div>
               <div className="lg:w-[45%] space-y-4">
@@ -398,7 +398,7 @@ export default function ApproveDecisionWorkspace({row,isOpen,onClose,onSubmit}){
                     const initials=item.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
                     return(
                       <li key={i} className="flex items-start gap-2.5 p-2.5 rounded-xl bg-green-50/40 border border-green-100">
-                        <div className="h-7 w-7 rounded-lg bg-green-100 flex items-center justify-center shrink-0 mt-0.5"><span className="text-[9px] font-bold text-green-700">{initials}</span></div>
+                        <div className="h-7 w-7 rounded-lg bg-green-100 flex items-center justify-center shrink-0 mt-0.5"><span className="text-[0.5625rem] font-bold text-green-700">{initials}</span></div>
                         <div className="flex-1 min-w-0"><span className="text-sm text-gray-700 leading-snug">{item}</span></div>
                         <CheckCircle className="h-4 w-4 text-green-500 shrink-0 mt-0.5" strokeWidth={2.5}/>
                       </li>
@@ -451,8 +451,8 @@ export default function ApproveDecisionWorkspace({row,isOpen,onClose,onSubmit}){
                               const ext=att.name.split('.').pop().toLowerCase();
                               return(
                                 <div key={att.id} className="flex items-center gap-2 p-2 rounded-lg border border-gray-100 bg-gray-50/50">
-                                  <div className="h-7 w-7 rounded-md bg-green-50 flex items-center justify-center shrink-0"><span className="text-[8px] font-bold text-green-600 uppercase">{ext}</span></div>
-                                  <div className="flex-1 min-w-0"><p className="text-xs text-gray-700 truncate">{att.name}</p><p className="text-[10px] text-gray-400">{att.size} &middot; {att.date}</p></div>
+                                  <div className="h-7 w-7 rounded-md bg-green-50 flex items-center justify-center shrink-0"><span className="text-[0.5rem] font-bold text-green-600 uppercase">{ext}</span></div>
+                                  <div className="flex-1 min-w-0"><p className="text-xs text-gray-700 truncate">{att.name}</p><p className="text-[0.625rem] text-gray-400">{att.size} &middot; {att.date}</p></div>
                                   <button onClick={()=>setHistoryPreviewDoc(att)} className="p-1 rounded hover:bg-white text-gray-400 hover:text-icrcs-navy transition-colors" title="View"><Eye className="h-3.5 w-3.5"/></button>
                                   <button className="p-1 rounded hover:bg-white text-gray-400 hover:text-icrcs-navy transition-colors" title="Download"><Download className="h-3.5 w-3.5"/></button>
                                 </div>
@@ -497,12 +497,12 @@ export default function ApproveDecisionWorkspace({row,isOpen,onClose,onSubmit}){
                         return(
                           <div key={d.id} className="flex items-center justify-between gap-2 p-2.5 rounded-xl border border-gray-100 bg-gray-50/50">
                             <div className="flex items-center gap-2 min-w-0">
-                              {d.status==='ready'?<><div className="h-7 w-7 rounded-md bg-green-50 flex items-center justify-center shrink-0"><span className="text-[8px] font-bold text-green-600 uppercase">{ext}</span></div><span className="text-xs text-gray-700 truncate">{d.name}</span><span className="text-[10px] text-green-600 shrink-0">Ready</span></>:<><div className="h-7 w-7 rounded-md bg-gray-100 flex items-center justify-center shrink-0"><FileText className="h-3 w-3 text-gray-400"/></div><span className="text-xs text-gray-400">No file selected</span></>}
+                              {d.status==='ready'?<><div className="h-7 w-7 rounded-md bg-green-50 flex items-center justify-center shrink-0"><span className="text-[0.5rem] font-bold text-green-600 uppercase">{ext}</span></div><span className="text-xs text-gray-700 truncate">{d.name}</span><span className="text-[0.625rem] text-green-600 shrink-0">Ready</span></>:<><div className="h-7 w-7 rounded-md bg-gray-100 flex items-center justify-center shrink-0"><FileText className="h-3 w-3 text-gray-400"/></div><span className="text-xs text-gray-400">No file selected</span></>}
                             </div>
                             <div className="flex items-center gap-1 shrink-0">
                               {d.status==='pending'&&(<>
                                 <input type="file" accept=".pdf" ref={el=>{if(el)decisionFileRef.current[d.id]=el;}} onChange={e=>handleDecisionAttachmentUpload(d.id,e)} className="hidden"/>
-                                <button onClick={()=>decisionFileRef.current[d.id]?.click()} className="px-2 py-1 rounded-lg border border-gray-200 text-[10px] font-medium text-gray-500 hover:bg-white transition-colors">Choose</button>
+                                <button onClick={()=>decisionFileRef.current[d.id]?.click()} className="px-2 py-1 rounded-lg border border-gray-200 text-[0.625rem] font-medium text-gray-500 hover:bg-white transition-colors">Choose</button>
                               </>)}
                               <button onClick={()=>removeDecisionAttachment(d.id)} className="p-1 rounded hover:bg-white text-gray-400 hover:text-red-500 transition-colors"><Trash2 className="h-3 w-3"/></button>
                             </div>

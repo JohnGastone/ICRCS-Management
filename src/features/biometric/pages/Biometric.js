@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { getEnrollmentQueue, getCaseBySubject, enrollCase } from '../../../services/managementService';
 import { Search, Globe, AlertCircle, Loader2, Eye, Camera, CheckCircle, X, XCircle, Fingerprint, ChevronDown, Filter, FileCheck, SendHorizontal, StickyNote, Upload, Pen, RefreshCw, AlertTriangle, Sun, Image, User, FolderOpen, ClipboardList, MessageSquare, ArrowLeft, Download, FileText, Clock, ArrowUpDown } from 'lucide-react';
-import ApplicantInfoView from '../../../components/common/ApplicantInfoView';
-import { buildApplicant } from '../../../data/mockApplicantData';
+import ApplicantReviewLoader from '../../../components/common/ApplicantReviewLoader';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import {
   startCapture,
@@ -875,7 +874,7 @@ export default function Biometric() {
       {/* Review Modal */}
       {showReviewModal && fetchedApp && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-0 md:p-4">
-          <div className="bg-white w-full h-full md:w-[85%] md:h-[90vh] lg:w-[75%] lg:max-w-[1100px] lg:h-auto lg:max-h-[85vh] rounded-none md:rounded-2xl border border-gray-200 shadow-2xl flex flex-col overflow-hidden">
+          <div className="bg-white w-full h-full md:w-[85%] md:h-[90vh] lg:w-[88%] lg:max-w-[90rem] lg:h-auto lg:max-h-[85vh] rounded-none md:rounded-2xl border border-gray-200 shadow-2xl flex flex-col overflow-hidden">
             {/* Header */}
             <div className="p-5 sm:p-6 border-b border-gray-100 flex items-center justify-between shrink-0 bg-white z-10">
               <div className="flex items-center gap-3">
@@ -908,7 +907,7 @@ export default function Biometric() {
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-5 sm:p-6">
-              {activeReviewTab==='info'&&<ApplicantInfoView data={buildApplicant(fetchedApp)}/>}
+              {activeReviewTab==='info'&&<ApplicantReviewLoader caseNo={fetchedApp?.caseNo}/>}
 
               {activeReviewTab==='attachments'&&(
                 <div className="flex flex-col lg:flex-row gap-5 h-full">
@@ -924,10 +923,10 @@ export default function Biometric() {
                         return(
                           <div key={i} className="flex items-center justify-between gap-2 p-3 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-gray-50 transition-colors">
                             <div className="flex items-center gap-2.5 min-w-0">
-                              <div className="h-9 w-9 rounded-lg bg-red-50 flex items-center justify-center shrink-0"><span className="text-[9px] font-bold text-red-600 uppercase">{ext}</span></div>
+                              <div className="h-9 w-9 rounded-lg bg-red-50 flex items-center justify-center shrink-0"><span className="text-[0.5625rem] font-bold text-red-600 uppercase">{ext}</span></div>
                               <div className="min-w-0">
                                 <div className="text-xs font-medium text-gray-700 truncate">{name}</div>
-                                <div className="text-[10px] text-gray-400">Uploaded via Online Portal</div>
+                                <div className="text-[0.625rem] text-gray-400">Uploaded via Online Portal</div>
                               </div>
                             </div>
                             <div className="flex items-center gap-1 shrink-0">
@@ -1031,7 +1030,7 @@ export default function Biometric() {
                 ) : null}
                 <div className={`w-full h-full flex-col items-center justify-center gap-1 ${quickServeTarget.photoUrl ? 'hidden' : 'flex'}`}>
                   <User className="h-12 w-12 text-gray-300" />
-                  <span className="text-[9px] text-gray-400 font-medium uppercase tracking-wide">No Photo</span>
+                  <span className="text-[0.5625rem] text-gray-400 font-medium uppercase tracking-wide">No Photo</span>
                 </div>
               </div>
 
@@ -1186,10 +1185,10 @@ export default function Biometric() {
           )}
         </div>
         <div className="p-4 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-[11px] text-gray-500">
+          <div className="flex items-center gap-2 text-[0.6875rem] text-gray-500">
             <span>Rows:</span>
             <div className="relative">
-              <select value={rowsPerPage} onChange={(e) => { setRowsPerPage(Number(e.target.value)); setCurrentPage(1); }} className="appearance-none pl-2 pr-6 py-1 rounded-lg border border-gray-200 bg-white text-[11px] font-medium text-gray-600 focus:outline-none cursor-pointer">
+              <select value={rowsPerPage} onChange={(e) => { setRowsPerPage(Number(e.target.value)); setCurrentPage(1); }} className="appearance-none pl-2 pr-6 py-1 rounded-lg border border-gray-200 bg-white text-[0.6875rem] font-medium text-gray-600 focus:outline-none cursor-pointer">
                 {rowsPerPageOptions.map(n => <option key={n} value={n}>{n}</option>)}
               </select>
               <ChevronDown className="h-3 w-3 text-gray-400 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -1197,11 +1196,11 @@ export default function Biometric() {
             <span>Showing {filteredQueue.length > 0 ? startIndex + 1 : 0} to {endIndex} of {filteredQueue.length}</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <button onClick={goFirst} disabled={safePage <= 1} className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-[11px] font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-40">First</button>
-            <button onClick={goPrev} disabled={safePage <= 1} className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-[11px] font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-40">Prev</button>
-            <span className="px-3 py-1.5 rounded-lg bg-gray-50 border border-gray-200 text-[11px] font-semibold text-gray-700">{safePage}/{totalPages}</span>
-            <button onClick={goNext} disabled={safePage >= totalPages} className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-[11px] font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-40">Next</button>
-            <button onClick={goLast} disabled={safePage >= totalPages} className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-[11px] font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-40">Last</button>
+            <button onClick={goFirst} disabled={safePage <= 1} className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-[0.6875rem] font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-40">First</button>
+            <button onClick={goPrev} disabled={safePage <= 1} className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-[0.6875rem] font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-40">Prev</button>
+            <span className="px-3 py-1.5 rounded-lg bg-gray-50 border border-gray-200 text-[0.6875rem] font-semibold text-gray-700">{safePage}/{totalPages}</span>
+            <button onClick={goNext} disabled={safePage >= totalPages} className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-[0.6875rem] font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-40">Next</button>
+            <button onClick={goLast} disabled={safePage >= totalPages} className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-[0.6875rem] font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-40">Last</button>
           </div>
         </div>
       </div>
@@ -1209,7 +1208,7 @@ export default function Biometric() {
       {/* View Details Modal */}
       {showViewModal && viewTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-0 md:p-4">
-          <div className="bg-white w-full h-full md:w-[85%] md:h-[90vh] lg:w-[75%] lg:max-w-[1100px] lg:h-auto lg:max-h-[85vh] rounded-none md:rounded-2xl border border-gray-200 shadow-2xl flex flex-col overflow-hidden">
+          <div className="bg-white w-full h-full md:w-[85%] md:h-[90vh] lg:w-[88%] lg:max-w-[90rem] lg:h-auto lg:max-h-[85vh] rounded-none md:rounded-2xl border border-gray-200 shadow-2xl flex flex-col overflow-hidden">
             {/* Header */}
             <div className="p-5 sm:p-6 border-b border-gray-100 flex items-center justify-between shrink-0 bg-white z-10">
               <div className="flex items-center gap-3">
@@ -1242,7 +1241,7 @@ export default function Biometric() {
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-5 sm:p-6">
-              {activeViewTab==='info'&&<ApplicantInfoView data={buildApplicant(viewTarget)}/>}
+              {activeViewTab==='info'&&<ApplicantReviewLoader caseNo={viewTarget?.caseNo}/>}
 
               {activeViewTab==='attachments'&&(
                 <div className="flex flex-col lg:flex-row gap-5 h-full">
@@ -1258,10 +1257,10 @@ export default function Biometric() {
                         return(
                           <div key={i} className="flex items-center justify-between gap-2 p-3 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-gray-50 transition-colors">
                             <div className="flex items-center gap-2.5 min-w-0">
-                              <div className="h-9 w-9 rounded-lg bg-red-50 flex items-center justify-center shrink-0"><span className="text-[9px] font-bold text-red-600 uppercase">{ext}</span></div>
+                              <div className="h-9 w-9 rounded-lg bg-red-50 flex items-center justify-center shrink-0"><span className="text-[0.5625rem] font-bold text-red-600 uppercase">{ext}</span></div>
                               <div className="min-w-0">
                                 <div className="text-xs font-medium text-gray-700 truncate">{name}</div>
-                                <div className="text-[10px] text-gray-400">Uploaded via Online Portal</div>
+                                <div className="text-[0.625rem] text-gray-400">Uploaded via Online Portal</div>
                               </div>
                             </div>
                             <div className="flex items-center gap-1 shrink-0">
@@ -1366,7 +1365,7 @@ export default function Biometric() {
       {/* Biometric Enrollment Modal */}
       {showCaptureModal && captureTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-0 md:p-4">
-          <div className="bg-white w-full h-full md:w-[85%] md:h-[90vh] lg:w-[75%] lg:max-w-[1100px] lg:h-auto lg:max-h-[85vh] rounded-none md:rounded-2xl border border-gray-200 shadow-2xl flex flex-col overflow-hidden">
+          <div className="bg-white w-full h-full md:w-[85%] md:h-[90vh] lg:w-[88%] lg:max-w-[90rem] lg:h-auto lg:max-h-[85vh] rounded-none md:rounded-2xl border border-gray-200 shadow-2xl flex flex-col overflow-hidden">
             {/* Header */}
             <div className="flex items-start justify-between p-5 sm:p-6 border-b border-gray-100 bg-gray-50/50 shrink-0">
               <div className="min-w-0">

@@ -69,10 +69,10 @@ export default function AttachmentsModal({row,isOpen,onClose}){
                   return(
                     <div key={d.id} className="flex items-center justify-between gap-2 p-3 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-gray-50 transition-colors">
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="h-9 w-9 rounded-lg bg-red-50 flex items-center justify-center shrink-0"><span className="text-[9px] font-bold text-red-600 uppercase">{ext}</span></div>
+                        <div className="h-9 w-9 rounded-lg bg-red-50 flex items-center justify-center shrink-0"><span className="text-[0.5625rem] font-bold text-red-600 uppercase">{ext}</span></div>
                         <div className="min-w-0">
                           <div className="text-xs font-medium text-gray-700 truncate">{d.name}</div>
-                          <div className="text-[10px] text-gray-400">{d.size} · {d.date} · {d.uploader}</div>
+                          <div className="text-[0.625rem] text-gray-400">{d.size} · {d.date} · {d.uploader}</div>
                         </div>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
@@ -93,10 +93,10 @@ export default function AttachmentsModal({row,isOpen,onClose}){
                       return(
                         <div key={d.id} className="flex items-center justify-between gap-2 p-3 rounded-xl border border-dashed border-green-300 bg-green-50/30">
                           <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="h-9 w-9 rounded-lg bg-green-50 flex items-center justify-center shrink-0"><span className="text-[9px] font-bold text-green-600 uppercase">{ext}</span></div>
+                            <div className="h-9 w-9 rounded-lg bg-green-50 flex items-center justify-center shrink-0"><span className="text-[0.5625rem] font-bold text-green-600 uppercase">{ext}</span></div>
                             <div className="min-w-0">
                               <div className="text-xs font-medium text-gray-700 truncate">{d.name}</div>
-                              <div className="text-[10px] text-green-600">{d.size} · Ready</div>
+                              <div className="text-[0.625rem] text-green-600">{d.size} · Ready</div>
                             </div>
                           </div>
                           <div className="flex items-center gap-1 shrink-0">
@@ -116,7 +116,7 @@ export default function AttachmentsModal({row,isOpen,onClose}){
                 <button onClick={()=>fileRef.current?.click()} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-icrcs-navy text-white text-sm font-semibold hover:bg-icrcs-navy-light transition-colors shadow-sm">
                   <Upload className="h-4 w-4"/>Upload Document
                 </button>
-                <p className="text-[11px] text-gray-400 mt-2">Supported: PDF only · Max 5 MB per file</p>
+                <p className="text-[0.6875rem] text-gray-400 mt-2">Supported: PDF only · Max 5 MB per file</p>
               </div>
             </div>
 

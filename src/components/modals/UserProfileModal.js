@@ -51,7 +51,7 @@ export default function UserProfileModal({ isOpen, onClose }) {
                   <item.icon className="h-5 w-5" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">{item.label}</p>
+                  <p className="text-[0.6875rem] font-semibold text-gray-400 uppercase tracking-wider">{item.label}</p>
                   <p className="text-sm font-semibold text-gray-800 truncate">{item.value}</p>
                 </div>
               </div>

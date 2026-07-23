@@ -53,19 +53,19 @@ export default function InternalLayout({ children }) {
   };
 
   return (
-    <div className="min-h-screen bg-bg flex">
+    <div className="min-h-screen bg-bg flex overflow-x-clip">
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex flex-col w-[285px] bg-icrcs-navy sticky top-0 h-screen text-white">
+      <aside className="hidden lg:flex flex-col w-[17.8rem] bg-icrcs-navy sticky top-0 h-screen text-white">
         {/* Gold accent line */}
         <div className="h-1 bg-icrcs-gold shrink-0" />
 
         {/* Logo */}
         <div className="h-20 flex items-center px-5 border-b border-white/10">
           <div className="h-12 w-12 rounded-xl bg-icrcs-gold flex items-center justify-center mr-4 overflow-hidden shrink-0">
-            <img src={logo} alt="ICRCS Logo" className="h-10 w-10 object-contain" />
+            <img src={logo} alt="CRCS Logo" className="h-10 w-10 object-contain" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-white leading-tight">ICRCS</h1>
+            <h1 className="text-xl font-bold text-white leading-tight">CRCS</h1>
             <p className="text-xs text-white/50 font-medium tracking-wider uppercase">Government Portal</p>
           </div>
         </div>
@@ -83,7 +83,7 @@ export default function InternalLayout({ children }) {
                   <>
                     <button
                       onClick={() => toggleMenu(item.path)}
-                      className={`flex items-center justify-between w-full gap-3 px-3 py-2.5 rounded-xl text-[15px] font-medium transition-all ${
+                      className={`flex items-center justify-between w-full gap-3 px-3 py-2.5 rounded-xl text-[0.9375rem] font-medium transition-all ${
                         isActive
                           ? 'bg-icrcs-gold text-icrcs-navy shadow-sm'
                           : 'text-white/70 hover:text-white hover:bg-white/10'
@@ -119,7 +119,7 @@ export default function InternalLayout({ children }) {
                 ) : (
                   <Link
                     to={item.path}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-[15px] font-medium transition-all ${
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-[0.9375rem] font-medium transition-all ${
                       isActive
                         ? 'bg-icrcs-gold text-icrcs-navy shadow-sm'
                         : 'text-white/70 hover:text-white hover:bg-white/10'
@@ -138,7 +138,7 @@ export default function InternalLayout({ children }) {
         <div className="p-3 border-t border-white/10">
           <button
             onClick={() => { logout(); navigate('/'); }}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-[15px] font-medium text-white/70 hover:text-white hover:bg-white/10 w-full transition-colors"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-[0.9375rem] font-medium text-white/70 hover:text-white hover:bg-white/10 w-full transition-colors"
           >
             <LogOut className="h-[18px] w-[18px]" />
             <span>Logout</span>
@@ -147,11 +147,11 @@ export default function InternalLayout({ children }) {
       </aside>
 
       {/* Tablet Icon Sidebar */}
-      <aside className="hidden md:flex lg:hidden flex-col w-[72px] bg-icrcs-navy sticky top-0 h-screen text-white items-center shrink-0">
+      <aside className="hidden md:flex lg:hidden flex-col w-[4.5rem] bg-icrcs-navy sticky top-0 h-screen text-white items-center shrink-0">
         <div className="h-1 bg-icrcs-gold shrink-0 w-full" />
         <div className="h-16 flex items-center justify-center w-full border-b border-white/10">
           <div className="h-9 w-9 rounded-lg bg-icrcs-gold flex items-center justify-center overflow-hidden shrink-0">
-            <img src={logo} alt="ICRCS" className="h-7 w-7 object-contain" />
+            <img src={logo} alt="CRCS" className="h-7 w-7 object-contain" />
           </div>
         </div>
         <nav className="flex-1 py-3 space-y-1 overflow-y-auto w-full">
@@ -193,14 +193,14 @@ export default function InternalLayout({ children }) {
       {sidebarOpen && (
         <>
           <div className="fixed inset-0 bg-black/30 z-40 lg:hidden backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
-          <aside className="fixed inset-y-0 left-0 z-50 w-[285px] bg-icrcs-navy flex flex-col lg:hidden animate-slide-up">
+          <aside className="fixed inset-y-0 left-0 z-50 w-[17.8rem] bg-icrcs-navy flex flex-col lg:hidden animate-slide-up">
             <div className="h-1 bg-icrcs-gold shrink-0" />
             <div className="h-20 flex items-center justify-between px-5 border-b border-white/10">
               <div className="flex items-center">
                 <div className="h-12 w-12 rounded-xl bg-icrcs-gold flex items-center justify-center mr-4 overflow-hidden shrink-0">
-                  <img src={logo} alt="ICRCS Logo" className="h-10 w-10 object-contain" />
+                  <img src={logo} alt="CRCS Logo" className="h-10 w-10 object-contain" />
                 </div>
-                <span className="text-xl font-bold text-white">ICRCS</span>
+                <span className="text-xl font-bold text-white">CRCS</span>
               </div>
               <button onClick={() => setSidebarOpen(false)} className="p-1.5 rounded-lg hover:bg-white/10">
                 <X className="h-5 w-5 text-white/70" />
@@ -218,7 +218,7 @@ export default function InternalLayout({ children }) {
                       <>
                         <button
                           onClick={() => toggleMenu(item.path)}
-                          className={`flex items-center justify-between w-full gap-3 px-3 py-2.5 rounded-xl text-[15px] font-medium transition-all ${
+                          className={`flex items-center justify-between w-full gap-3 px-3 py-2.5 rounded-xl text-[0.9375rem] font-medium transition-all ${
                             isActive
                               ? 'bg-icrcs-gold text-icrcs-navy'
                               : 'text-white/70 hover:text-white hover:bg-white/10'
@@ -257,7 +257,7 @@ export default function InternalLayout({ children }) {
                         key={item.path}
                         to={item.path}
                         onClick={() => setSidebarOpen(false)}
-                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-[15px] font-medium transition-all ${
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-[0.9375rem] font-medium transition-all ${
                           isActive
                             ? 'bg-icrcs-gold text-icrcs-navy'
                             : 'text-white/70 hover:text-white hover:bg-white/10'
@@ -272,7 +272,7 @@ export default function InternalLayout({ children }) {
               })}
             </nav>
             <div className="p-3 border-t border-white/10">
-              <button onClick={() => { logout(); setSidebarOpen(false); navigate('/'); }} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-[15px] font-medium text-white/70 hover:text-white hover:bg-white/10 w-full">
+              <button onClick={() => { logout(); setSidebarOpen(false); navigate('/'); }} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-[0.9375rem] font-medium text-white/70 hover:text-white hover:bg-white/10 w-full">
                 <LogOut className="h-[18px] w-[18px]" /> <span>Logout</span>
               </button>
             </div>
@@ -283,7 +283,8 @@ export default function InternalLayout({ children }) {
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <header className="h-16 bg-surface border-b border-border flex items-center justify-between px-4 sm:px-6 lg:px-8 sticky top-0 z-30">
+        <header className="h-16 bg-surface border-b border-border px-4 sm:px-6 lg:px-8 sticky top-0 z-30">
+          <div className="h-full mx-auto w-full max-w-[100rem] flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button onClick={() => setSidebarOpen(true)} className="md:hidden p-2 rounded-lg text-muted hover:bg-border/50 transition-colors">
               <Menu className="h-5 w-5" />
@@ -339,9 +340,12 @@ export default function InternalLayout({ children }) {
               )}
             </div>
           </div>
+          </div>
         </header>
 
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">{children}</main>
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+          <div className="mx-auto w-full max-w-[100rem]">{children}</div>
+        </main>
 
         {/* Mobile Bottom Nav */}
         <nav className="md:hidden fixed bottom-0 inset-x-0 bg-surface border-t border-border z-40 px-2 pb-safe">
@@ -357,7 +361,7 @@ export default function InternalLayout({ children }) {
                   }`}
                 >
                   <item.icon className="h-5 w-5" />
-                  <span className="text-[10px] font-medium">{item.label}</span>
+                  <span className="text-[0.625rem] font-medium">{item.label}</span>
                 </Link>
               );
             })}

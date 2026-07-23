@@ -192,7 +192,7 @@ export default function AdjudicationWorkspace({ row, isOpen, onClose, onSubmit }
                 <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                   <div className="px-4 py-3 border-b border-gray-100 bg-sky-50/50 flex items-center gap-2">
                     <div className="h-8 w-8 rounded-lg bg-sky-100 flex items-center justify-center"><User className="h-4 w-4 text-sky-600" /></div>
-                    <div><h3 className="text-sm font-bold text-gray-800">Current Applicant</h3><p className="text-[10px] text-gray-500">Section A</p></div>
+                    <div><h3 className="text-sm font-bold text-gray-800">Current Applicant</h3><p className="text-[0.625rem] text-gray-500">Section A</p></div>
                   </div>
                   <div className="p-4 space-y-1">
                     <div className="flex justify-center mb-3">
@@ -218,7 +218,7 @@ export default function AdjudicationWorkspace({ row, isOpen, onClose, onSubmit }
                 <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                   <div className="px-4 py-3 border-b border-gray-100 bg-purple-50/50 flex items-center gap-2">
                     <div className="h-8 w-8 rounded-lg bg-purple-100 flex items-center justify-center"><User className="h-4 w-4 text-purple-600" /></div>
-                    <div><h3 className="text-sm font-bold text-gray-800">Matched Record</h3><p className="text-[10px] text-gray-500">Section B</p></div>
+                    <div><h3 className="text-sm font-bold text-gray-800">Matched Record</h3><p className="text-[0.625rem] text-gray-500">Section B</p></div>
                   </div>
                   <div className="p-4 space-y-1">
                     <div className="flex justify-center mb-3">
@@ -286,7 +286,7 @@ export default function AdjudicationWorkspace({ row, isOpen, onClose, onSubmit }
                           <td className="px-4 py-2.5 text-center">{v.captured ? <CheckCircle className="h-4 w-4 text-green-500 mx-auto" /> : <XCircle className="h-4 w-4 text-gray-300 mx-auto" />}</td>
                           <td className="px-4 py-2.5 text-center">{v.existing ? <CheckCircle className="h-4 w-4 text-green-500 mx-auto" /> : <XCircle className="h-4 w-4 text-gray-300 mx-auto" />}</td>
                           <td className="px-4 py-2.5 text-center text-xs font-mono font-semibold text-icrcs-navy">{v.score}</td>
-                          <td className="px-4 py-2.5"><span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${v.result === 'Match' ? 'bg-green-50 text-green-600 border-green-100' : 'bg-gray-50 text-gray-500 border-gray-200'}`}>{v.result}</span></td>
+                          <td className="px-4 py-2.5"><span className={`text-[0.625rem] px-2 py-0.5 rounded-full border font-medium ${v.result === 'Match' ? 'bg-green-50 text-green-600 border-green-100' : 'bg-gray-50 text-gray-500 border-gray-200'}`}>{v.result}</span></td>
                         </tr>
                       ))}
                     </tbody>
@@ -304,22 +304,22 @@ export default function AdjudicationWorkspace({ row, isOpen, onClose, onSubmit }
                   <button onClick={() => setDecision('same')} className={`p-4 rounded-xl border-2 text-left transition-all ${decision === 'same' ? 'border-green-500 bg-green-50' : 'border-gray-100 hover:border-green-300'}`}>
                     <CheckCircle className="h-5 w-5 text-green-600 mb-2" />
                     <p className="text-xs font-bold text-gray-800">Same Applicant</p>
-                    <p className="text-[10px] text-gray-500 mt-1">Both records belong to the same person. Continue using original record.</p>
+                    <p className="text-[0.625rem] text-gray-500 mt-1">Both records belong to the same person. Continue using original record.</p>
                   </button>
                   <button onClick={() => setDecision('different')} className={`p-4 rounded-xl border-2 text-left transition-all ${decision === 'different' ? 'border-sky-500 bg-sky-50' : 'border-gray-100 hover:border-sky-300'}`}>
                     <XCircle className="h-5 w-5 text-sky-600 mb-2" />
                     <p className="text-xs font-bold text-gray-800">Different Applicants</p>
-                    <p className="text-[10px] text-gray-500 mt-1">Biometric similarity exists but demographics differ. Allow to proceed.</p>
+                    <p className="text-[0.625rem] text-gray-500 mt-1">Biometric similarity exists but demographics differ. Allow to proceed.</p>
                   </button>
                   <button onClick={() => setDecision('fraud')} className={`p-4 rounded-xl border-2 text-left transition-all ${decision === 'fraud' ? 'border-red-500 bg-red-50' : 'border-gray-100 hover:border-red-300'}`}>
                     <AlertTriangle className="h-5 w-5 text-red-600 mb-2" />
                     <p className="text-xs font-bold text-gray-800">Suspected Fraud</p>
-                    <p className="text-[10px] text-gray-500 mt-1">Multiple identities or inconsistent documents. Escalate to Investigation Unit.</p>
+                    <p className="text-[0.625rem] text-gray-500 mt-1">Multiple identities or inconsistent documents. Escalate to Investigation Unit.</p>
                   </button>
                   <button onClick={() => setDecision('insufficient')} className={`p-4 rounded-xl border-2 text-left transition-all ${decision === 'insufficient' ? 'border-amber-500 bg-amber-50' : 'border-gray-100 hover:border-amber-300'}`}>
                     <MessageSquare className="h-5 w-5 text-amber-600 mb-2" />
                     <p className="text-xs font-bold text-gray-800">Insufficient Evidence</p>
-                    <p className="text-[10px] text-gray-500 mt-1">Evidence cannot support a conclusion. Request additional documents or re-interview.</p>
+                    <p className="text-[0.625rem] text-gray-500 mt-1">Evidence cannot support a conclusion. Request additional documents or re-interview.</p>
                   </button>
                 </div>
               </div>

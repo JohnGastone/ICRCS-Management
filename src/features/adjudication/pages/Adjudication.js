@@ -103,11 +103,11 @@ return(
      {paginated.map(row=><tr key={row.caseNo} className="border-b border-gray-50 hover:bg-gray-50/40 transition-colors">
       <td className="px-4 py-3 font-mono text-gray-700">{row.caseNo}</td>
       <td className="px-4 py-3 font-mono text-gray-700">{row.appNo}</td>
-      <td className="px-4 py-3"><div className="font-medium text-gray-800">{row.fullName}</div><div className="text-[10px] text-gray-400">{row.nationality}</div></td>
+      <td className="px-4 py-3"><div className="font-medium text-gray-800">{row.fullName}</div><div className="text-[0.625rem] text-gray-400">{row.nationality}</div></td>
       <td className="px-4 py-3"><div className="font-medium text-gray-800">{row.matchedName}</div></td>
       <td className="px-4 py-3 text-gray-700 text-xs">{row.adjudicationType}</td>
       <td className="px-4 py-3"><span className="text-xs font-mono font-semibold text-icrcs-navy">{row.matchScore}</span></td>
-      <td className="px-4 py-3"><span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${statusBadge(row.status)}`}>{row.status}</span></td>
+      <td className="px-4 py-3"><span className={`text-[0.625rem] px-2 py-0.5 rounded-full border font-medium ${statusBadge(row.status)}`}>{row.status}</span></td>
       <td className="px-4 py-3 text-gray-500 text-xs">{row.dateAssigned}</td>
       <td className="px-4 py-3 text-right">
        <div className="flex items-center justify-end">
@@ -121,17 +121,17 @@ return(
   </div>
 
   <div className="p-4 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-   <div className="flex items-center gap-2 text-[11px] text-gray-500">
+   <div className="flex items-center gap-2 text-[0.6875rem] text-gray-500">
     <span>Rows:</span>
-    <div className="relative"><select value={rowsPerPage} onChange={e=>{setRowsPerPage(Number(e.target.value));setCurrentPage(1);}} className="appearance-none pl-2 pr-6 py-1 rounded-lg border border-gray-200 bg-white text-[11px] font-medium text-gray-600 focus:outline-none cursor-pointer">{rowsPerPageOptions.map(o=><option key={o} value={o}>{o}</option>)}</select><ChevronDown className="h-3 w-3 text-gray-400 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none"/></div>
+    <div className="relative"><select value={rowsPerPage} onChange={e=>{setRowsPerPage(Number(e.target.value));setCurrentPage(1);}} className="appearance-none pl-2 pr-6 py-1 rounded-lg border border-gray-200 bg-white text-[0.6875rem] font-medium text-gray-600 focus:outline-none cursor-pointer">{rowsPerPageOptions.map(o=><option key={o} value={o}>{o}</option>)}</select><ChevronDown className="h-3 w-3 text-gray-400 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none"/></div>
     <span>Showing {sorted.length>0?startIndex+1:0} to {Math.min(startIndex+rowsPerPage,sorted.length)} of {sorted.length}</span>
    </div>
    <div className="flex items-center gap-1.5">
-    <button onClick={()=>goToPage(1)} disabled={safePage<=1} className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-[11px] font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-40">First</button>
-    <button onClick={()=>goToPage(safePage-1)} disabled={safePage<=1} className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-[11px] font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-40">Prev</button>
-    <span className="px-3 py-1.5 rounded-lg bg-gray-50 border border-gray-200 text-[11px] font-semibold text-gray-700">{safePage}/{totalPages}</span>
-    <button onClick={()=>goToPage(safePage+1)} disabled={safePage>=totalPages} className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-[11px] font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-40">Next</button>
-    <button onClick={()=>goToPage(totalPages)} disabled={safePage>=totalPages} className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-[11px] font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-40">Last</button>
+    <button onClick={()=>goToPage(1)} disabled={safePage<=1} className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-[0.6875rem] font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-40">First</button>
+    <button onClick={()=>goToPage(safePage-1)} disabled={safePage<=1} className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-[0.6875rem] font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-40">Prev</button>
+    <span className="px-3 py-1.5 rounded-lg bg-gray-50 border border-gray-200 text-[0.6875rem] font-semibold text-gray-700">{safePage}/{totalPages}</span>
+    <button onClick={()=>goToPage(safePage+1)} disabled={safePage>=totalPages} className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-[0.6875rem] font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-40">Next</button>
+    <button onClick={()=>goToPage(totalPages)} disabled={safePage>=totalPages} className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-[0.6875rem] font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-40">Last</button>
    </div>
   </div>
  </div>

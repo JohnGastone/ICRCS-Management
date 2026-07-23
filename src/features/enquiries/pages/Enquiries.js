@@ -179,21 +179,21 @@ export default function Enquiries() {
                     <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Personal Information</h4>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                       <div className="p-3 rounded-xl bg-gray-50/60 border border-gray-100">
-                        <span className="text-[10px] text-gray-500 uppercase tracking-wide block mb-1">Date of Birth</span>
+                        <span className="text-[0.625rem] text-gray-500 uppercase tracking-wide block mb-1">Date of Birth</span>
                         <p className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
                           <Calendar className="h-3.5 w-3.5 text-gray-400" /> {result.dob}
                         </p>
                       </div>
                       <div className="p-3 rounded-xl bg-gray-50/60 border border-gray-100">
-                        <span className="text-[10px] text-gray-500 uppercase tracking-wide block mb-1">Gender</span>
+                        <span className="text-[0.625rem] text-gray-500 uppercase tracking-wide block mb-1">Gender</span>
                         <p className="text-sm font-semibold text-gray-900">{result.gender}</p>
                       </div>
                       <div className="p-3 rounded-xl bg-gray-50/60 border border-gray-100">
-                        <span className="text-[10px] text-gray-500 uppercase tracking-wide block mb-1">Nationality</span>
+                        <span className="text-[0.625rem] text-gray-500 uppercase tracking-wide block mb-1">Nationality</span>
                         <p className="text-sm font-semibold text-gray-900">{result.nationality}</p>
                       </div>
                       <div className="p-3 rounded-xl bg-gray-50/60 border border-gray-100">
-                        <span className="text-[10px] text-gray-500 uppercase tracking-wide block mb-1">Case Reference</span>
+                        <span className="text-[0.625rem] text-gray-500 uppercase tracking-wide block mb-1">Case Reference</span>
                         <p className="text-sm font-semibold text-gray-900 font-mono">{result.caseRef}</p>
                       </div>
                     </div>
@@ -204,17 +204,17 @@ export default function Enquiries() {
                     <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Identification</h4>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       <div className="p-3 rounded-xl bg-gray-50/60 border border-gray-100">
-                        <span className="text-[10px] text-gray-500 uppercase tracking-wide block mb-1">Fingerprint No.</span>
+                        <span className="text-[0.625rem] text-gray-500 uppercase tracking-wide block mb-1">Fingerprint No.</span>
                         <p className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
                           <Fingerprint className="h-3.5 w-3.5 text-gray-400" /> {result.fingerprintNo}
                         </p>
                       </div>
                       <div className="p-3 rounded-xl bg-gray-50/60 border border-gray-100">
-                        <span className="text-[10px] text-gray-500 uppercase tracking-wide block mb-1">National ID (NIN)</span>
+                        <span className="text-[0.625rem] text-gray-500 uppercase tracking-wide block mb-1">National ID (NIN)</span>
                         <p className="text-sm font-semibold text-gray-900 font-mono">{result.nin}</p>
                       </div>
                       <div className="p-3 rounded-xl bg-gray-50/60 border border-gray-100">
-                        <span className="text-[10px] text-gray-500 uppercase tracking-wide block mb-1">Passport No.</span>
+                        <span className="text-[0.625rem] text-gray-500 uppercase tracking-wide block mb-1">Passport No.</span>
                         <p className="text-sm font-semibold text-gray-900 font-mono">{result.passportNo}</p>
                       </div>
                     </div>
@@ -225,19 +225,19 @@ export default function Enquiries() {
                     <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Contact Details</h4>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       <div className="p-3 rounded-xl bg-gray-50/60 border border-gray-100">
-                        <span className="text-[10px] text-gray-500 uppercase tracking-wide block mb-1">Email</span>
+                        <span className="text-[0.625rem] text-gray-500 uppercase tracking-wide block mb-1">Email</span>
                         <p className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
                           <Mail className="h-3.5 w-3.5 text-gray-400" /> {result.email}
                         </p>
                       </div>
                       <div className="p-3 rounded-xl bg-gray-50/60 border border-gray-100">
-                        <span className="text-[10px] text-gray-500 uppercase tracking-wide block mb-1">Phone</span>
+                        <span className="text-[0.625rem] text-gray-500 uppercase tracking-wide block mb-1">Phone</span>
                         <p className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
                           <Phone className="h-3.5 w-3.5 text-gray-400" /> {result.phone}
                         </p>
                       </div>
                       <div className="p-3 rounded-xl bg-gray-50/60 border border-gray-100">
-                        <span className="text-[10px] text-gray-500 uppercase tracking-wide block mb-1">Address</span>
+                        <span className="text-[0.625rem] text-gray-500 uppercase tracking-wide block mb-1">Address</span>
                         <p className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
                           <MapPin className="h-3.5 w-3.5 text-gray-400" /> {result.address}
                         </p>
@@ -302,7 +302,7 @@ export default function Enquiries() {
                         </div>
                         <div>
                           <p className="text-sm font-semibold text-gray-900">{c.officer}</p>
-                          <p className="text-[10px] text-gray-500">{c.role} &middot; {c.date}</p>
+                          <p className="text-[0.625rem] text-gray-500">{c.role} &middot; {c.date}</p>
                         </div>
                       </div>
                       <p className="text-sm text-gray-700 leading-relaxed">{c.text}</p>
@@ -321,7 +321,7 @@ export default function Enquiries() {
                       </div>
                       <div>
                         <h4 className="text-sm font-bold text-gray-900">Assessor Checked Items</h4>
-                        <p className="text-[10px] text-gray-500">Grace Temu &middot; Assessment Officer</p>
+                        <p className="text-[0.625rem] text-gray-500">Grace Temu &middot; Assessment Officer</p>
                       </div>
                     </div>
                     <div className="rounded-xl border border-gray-200 overflow-hidden">
@@ -368,7 +368,7 @@ export default function Enquiries() {
                       </div>
                       <div>
                         <h4 className="text-sm font-bold text-gray-900">Approver Checked Items</h4>
-                        <p className="text-[10px] text-gray-500">Dr. Ramadhani &middot; Senior Approver</p>
+                        <p className="text-[0.625rem] text-gray-500">Dr. Ramadhani &middot; Senior Approver</p>
                       </div>
                     </div>
                     <div className="rounded-xl border border-gray-200 overflow-hidden">
@@ -444,30 +444,30 @@ export default function Enquiries() {
                   <p className="text-sm font-semibold text-gray-700">Document Attachment</p>
                   <p className="text-xs text-gray-400 mt-1">Preview not available. Scanned copy stored in physical archive.</p>
                 </div>
-                <span className="text-[10px] px-2 py-1 rounded-full bg-green-50 text-green-600 border border-green-100 font-medium">{selectedDoc.status}</span>
+                <span className="text-[0.625rem] px-2 py-1 rounded-full bg-green-50 text-green-600 border border-green-100 font-medium">{selectedDoc.status}</span>
               </div>
               {/* Document Details */}
               <div>
                 <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Document Details</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="p-3 rounded-xl bg-gray-50/60 border border-gray-100">
-                    <span className="text-[10px] text-gray-500 uppercase tracking-wide block mb-1">Reference Number</span>
+                    <span className="text-[0.625rem] text-gray-500 uppercase tracking-wide block mb-1">Reference Number</span>
                     <p className="text-sm font-semibold text-gray-900 font-mono">{selectedDoc.ref}</p>
                   </div>
                   <div className="p-3 rounded-xl bg-gray-50/60 border border-gray-100">
-                    <span className="text-[10px] text-gray-500 uppercase tracking-wide block mb-1">Status</span>
+                    <span className="text-[0.625rem] text-gray-500 uppercase tracking-wide block mb-1">Status</span>
                     <p className="text-sm font-semibold text-gray-900">{selectedDoc.status}</p>
                   </div>
                   <div className="p-3 rounded-xl bg-gray-50/60 border border-gray-100">
-                    <span className="text-[10px] text-gray-500 uppercase tracking-wide block mb-1">Date Issued</span>
+                    <span className="text-[0.625rem] text-gray-500 uppercase tracking-wide block mb-1">Date Issued</span>
                     <p className="text-sm font-semibold text-gray-900">{selectedDoc.issued}</p>
                   </div>
                   <div className="p-3 rounded-xl bg-gray-50/60 border border-gray-100">
-                    <span className="text-[10px] text-gray-500 uppercase tracking-wide block mb-1">Place of Issue</span>
+                    <span className="text-[0.625rem] text-gray-500 uppercase tracking-wide block mb-1">Place of Issue</span>
                     <p className="text-sm font-semibold text-gray-900">{selectedDoc.place}</p>
                   </div>
                   <div className="p-3 rounded-xl bg-gray-50/60 border border-gray-100 sm:col-span-2">
-                    <span className="text-[10px] text-gray-500 uppercase tracking-wide block mb-1">Verified By</span>
+                    <span className="text-[0.625rem] text-gray-500 uppercase tracking-wide block mb-1">Verified By</span>
                     <p className="text-sm font-semibold text-gray-900">{selectedDoc.officer}</p>
                   </div>
                 </div>

@@ -120,16 +120,16 @@ export default function EscalationCases() {
               className={`w-full text-left p-4 rounded-2xl border transition-all ${selected?.ref === c.ref ? 'border-icrcs-navy bg-icrcs-navy/5 shadow-sm' : 'border-gray-100 bg-white hover:shadow-sm'}`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-mono text-gray-500">{c.ref}</span>
-                <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${c.status === 'open' ? 'bg-amber-50 text-amber-700 border-amber-100' : 'bg-green-50 text-green-700 border-green-100'}`}>
+                <span className="text-[0.625rem] font-mono text-gray-500">{c.ref}</span>
+                <span className={`text-[0.625rem] px-2 py-0.5 rounded-full border font-medium ${c.status === 'open' ? 'bg-amber-50 text-amber-700 border-amber-100' : 'bg-green-50 text-green-700 border-green-100'}`}>
                   {c.status}
                 </span>
               </div>
               <p className="font-semibold text-gray-800 text-sm mt-1">{c.applicant}</p>
               <p className="text-xs text-gray-500">{c.type}</p>
               <div className="flex items-center gap-2 mt-2">
-                <span className={`text-[10px] px-1.5 py-0.5 rounded border ${reasonColors[c.reason] || 'bg-gray-50 text-gray-500 border-gray-100'}`}>{c.reason}</span>
-                <span className={`text-[10px] px-1.5 py-0.5 rounded border ${c.priority === 'urgent' ? 'bg-red-50 text-red-700 border-red-100' : c.priority === 'high' ? 'bg-amber-50 text-amber-700 border-amber-100' : 'bg-gray-50 text-gray-500 border-gray-100'}`}>{c.priority}</span>
+                <span className={`text-[0.625rem] px-1.5 py-0.5 rounded border ${reasonColors[c.reason] || 'bg-gray-50 text-gray-500 border-gray-100'}`}>{c.reason}</span>
+                <span className={`text-[0.625rem] px-1.5 py-0.5 rounded border ${c.priority === 'urgent' ? 'bg-red-50 text-red-700 border-red-100' : c.priority === 'high' ? 'bg-amber-50 text-amber-700 border-amber-100' : 'bg-gray-50 text-gray-500 border-gray-100'}`}>{c.priority}</span>
               </div>
             </button>
           ))}

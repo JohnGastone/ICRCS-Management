@@ -77,7 +77,7 @@ export default function Dashboard() {
         <div className="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-xl font-bold">Welcome back, {user?.name || 'Officer'}</h1>
-            <p className="text-white/70 text-sm mt-1">Manage and monitor ICRCS immigration status determination activities</p>
+            <p className="text-white/70 text-sm mt-1">Manage and monitor CRCS immigration status determination activities</p>
           </div>
           <div className="flex items-center gap-2 bg-white/10 rounded-xl px-4 py-2.5 shrink-0">
             <Calendar className="h-4 w-4 text-icrcs-gold" />
@@ -228,11 +228,11 @@ export default function Dashboard() {
             <table className="w-full text-sm">
               <thead className="bg-gray-50/60">
                 <tr>
-                  <th className="text-left px-5 py-3 font-semibold text-gray-500 text-[11px] uppercase tracking-wider">Reference</th>
-                  <th className="text-left px-5 py-3 font-semibold text-gray-500 text-[11px] uppercase tracking-wider">Applicant</th>
-                  <th className="text-left px-5 py-3 font-semibold text-gray-500 text-[11px] uppercase tracking-wider hidden md:table-cell">Type</th>
-                  <th className="text-left px-5 py-3 font-semibold text-gray-500 text-[11px] uppercase tracking-wider">Status</th>
-                  <th className="text-left px-5 py-3 font-semibold text-gray-500 text-[11px] uppercase tracking-wider hidden sm:table-cell">Date</th>
+                  <th className="text-left px-5 py-3 font-semibold text-gray-500 text-[0.6875rem] uppercase tracking-wider">Reference</th>
+                  <th className="text-left px-5 py-3 font-semibold text-gray-500 text-[0.6875rem] uppercase tracking-wider">Applicant</th>
+                  <th className="text-left px-5 py-3 font-semibold text-gray-500 text-[0.6875rem] uppercase tracking-wider hidden md:table-cell">Type</th>
+                  <th className="text-left px-5 py-3 font-semibold text-gray-500 text-[0.6875rem] uppercase tracking-wider">Status</th>
+                  <th className="text-left px-5 py-3 font-semibold text-gray-500 text-[0.6875rem] uppercase tracking-wider hidden sm:table-cell">Date</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -266,7 +266,7 @@ export default function Dashboard() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-gray-800">Start Biometric Enrollment</p>
-                  <p className="text-[11px] text-gray-500">Capture fingerprints and photos</p>
+                  <p className="text-[0.6875rem] text-gray-500">Capture fingerprints and photos</p>
                 </div>
                 <ChevronRight className="h-4 w-4 text-gray-400 shrink-0" />
               </Link>
@@ -276,7 +276,7 @@ export default function Dashboard() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-gray-800">Begin Assessment</p>
-                  <p className="text-[11px] text-gray-500">Review and assess applications</p>
+                  <p className="text-[0.6875rem] text-gray-500">Review and assess applications</p>
                 </div>
                 <ChevronRight className="h-4 w-4 text-gray-400 shrink-0" />
               </Link>
@@ -286,7 +286,7 @@ export default function Dashboard() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-gray-800">Review Decisions</p>
-                  <p className="text-[11px] text-gray-500">Approve or reject assessments</p>
+                  <p className="text-[0.6875rem] text-gray-500">Approve or reject assessments</p>
                 </div>
                 <ChevronRight className="h-4 w-4 text-gray-400 shrink-0" />
               </Link>
@@ -296,7 +296,7 @@ export default function Dashboard() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-gray-800">Open Escalation Cases</p>
-                  <p className="text-[11px] text-gray-500">High-risk and complex cases</p>
+                  <p className="text-[0.6875rem] text-gray-500">High-risk and complex cases</p>
                 </div>
                 <ChevronRight className="h-4 w-4 text-gray-400 shrink-0" />
               </Link>
@@ -306,7 +306,7 @@ export default function Dashboard() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-gray-800">Generate Reports</p>
-                  <p className="text-[11px] text-gray-500">Operational and management reports</p>
+                  <p className="text-[0.6875rem] text-gray-500">Operational and management reports</p>
                 </div>
                 <ChevronRight className="h-4 w-4 text-gray-400 shrink-0" />
               </Link>

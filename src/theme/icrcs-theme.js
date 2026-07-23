@@ -73,13 +73,16 @@ const fontFamily = {
   ],
 };
 
+// rem-based so every text-* utility scales with the root font-size clamp in
+// index.css (big-screen responsiveness). Values mirror the previous px sizes at a
+// 16px root (13/14/15/19/22/26px) — line-heights already rem, so they scale too.
 const fontSize = {
-  xs: ['13px', { lineHeight: '1.25rem' }],
-  sm: ['14px', { lineHeight: '1.25rem' }],
-  base: ['15px', { lineHeight: '1.5rem' }],
-  lg: ['19px', { lineHeight: '1.75rem' }],
-  xl: ['22px', { lineHeight: '1.75rem' }],
-  '2xl': ['26px', { lineHeight: '2rem' }],
+  xs: ['0.8125rem', { lineHeight: '1.25rem' }],
+  sm: ['0.875rem', { lineHeight: '1.25rem' }],
+  base: ['0.9375rem', { lineHeight: '1.5rem' }],
+  lg: ['1.1875rem', { lineHeight: '1.75rem' }],
+  xl: ['1.375rem', { lineHeight: '1.75rem' }],
+  '2xl': ['1.625rem', { lineHeight: '2rem' }],
 };
 
 const boxShadow = {

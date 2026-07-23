@@ -1,7 +1,7 @@
-import React from 'react';
-import{User,X,FileText,Eye,Download,Copy,ClipboardList,CheckCircle,Building2}from'lucide-react';
+import React,{useState,useEffect}from'react';
+import{User,X,FileText,Eye,Download,Copy,ClipboardList,CheckCircle,Building2,Loader2}from'lucide-react';
 import ApplicantInfoView from'../../../components/common/ApplicantInfoView';
-import{buildApplicant}from'../../../data/mockApplicantData';
+import{getApplicantReview}from'../../../services/managementService';
 
 const existingDocs=[
   {name:'Passport Copy.pdf',type:'PDF',date:'12-Jun-2026 09:15',size:'1.2 MB'},
@@ -26,13 +26,25 @@ function InfoRow({label,value,highlight,mono}){
 }
 
 export default function ViewCaseModal({row,isOpen,onClose}){
-  if(!isOpen||!row)return null;
+  const[applicant,setApplicant]=useState(null);
+  const[loading,setLoading]=useState(false);
+  const[error,setError]=useState('');
+  useEffect(()=>{
+    if(!isOpen||!row?.caseNo)return;
+    let cancelled=false;
+    setApplicant(null);setError('');setLoading(true);
+    getApplicantReview(row.caseNo)
+      .then(d=>{if(!cancelled)setApplicant(d);})
+      .catch(e=>{if(!cancelled)setError(e.message||'Failed to load applicant data.');})
+      .finally(()=>{if(!cancelled)setLoading(false);});
+    return()=>{cancelled=true;};
+  },[isOpen,row?.caseNo]);
 
-  const applicant=buildApplicant(row);
+  if(!isOpen||!row)return null;
 
   return(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-0 md:p-4">
-      <div className="bg-white w-full h-full md:w-[85%] md:h-[90vh] lg:w-[75%] lg:max-w-[1100px] lg:h-auto lg:max-h-[85vh] rounded-none md:rounded-2xl border border-gray-200 shadow-2xl flex flex-col overflow-hidden">
+      <div className="bg-white w-full h-full md:w-[85%] md:h-[90vh] lg:w-[88%] lg:max-w-[90rem] lg:h-auto lg:max-h-[85vh] rounded-none md:rounded-2xl border border-gray-200 shadow-2xl flex flex-col overflow-hidden">
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between shrink-0 bg-white z-10">
           <div className="flex items-center gap-3">
@@ -52,7 +64,11 @@ export default function ViewCaseModal({row,isOpen,onClose}){
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-5">
           <div className="space-y-5">
-            <ApplicantInfoView data={applicant}/>
+            {loading
+              ?<div className="flex flex-col items-center justify-center py-16 gap-2 text-gray-400"><Loader2 className="h-6 w-6 animate-spin"/><span className="text-sm">Loading applicant details…</span></div>
+              :error
+                ?<div className="p-4 rounded-xl bg-red-50 border border-red-100 flex items-center gap-2"><X className="h-4 w-4 text-red-600 shrink-0"/><span className="text-sm font-medium text-red-700">{error}</span></div>
+                :<ApplicantInfoView data={applicant}/>}
 
             <div className="flex flex-col lg:flex-row gap-5">
               {/* Case Details */}
@@ -81,10 +97,10 @@ export default function ViewCaseModal({row,isOpen,onClose}){
                       return(
                         <div key={i} className="flex items-center justify-between gap-2 p-3 rounded-xl bg-gray-50 border border-gray-100">
                           <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="h-8 w-8 rounded-lg bg-red-50 flex items-center justify-center shrink-0"><span className="text-[9px] font-bold text-red-600 uppercase">{ext}</span></div>
+                            <div className="h-8 w-8 rounded-lg bg-red-50 flex items-center justify-center shrink-0"><span className="text-[0.5625rem] font-bold text-red-600 uppercase">{ext}</span></div>
                             <div className="min-w-0">
                               <div className="text-xs font-medium text-gray-700 truncate">{d.name}</div>
-                              <div className="text-[10px] text-gray-400">{d.size} · {d.date}</div>
+                              <div className="text-[0.625rem] text-gray-400">{d.size} · {d.date}</div>
                             </div>
                           </div>
                           <div className="flex items-center gap-1 shrink-0">
@@ -102,19 +118,19 @@ export default function ViewCaseModal({row,isOpen,onClose}){
                   <div className="p-3 space-y-3">
                     <div className="flex gap-3">
                       <div className="flex flex-col items-center"><div className="h-2 w-2 rounded-full bg-green-500"></div><div className="w-px h-full bg-gray-200 mt-1"></div></div>
-                      <div className="pb-3"><div className="text-xs font-semibold text-gray-700">Application Received</div><div className="text-[10px] text-gray-400">{row.dateAssigned} · Registration Officer</div></div>
+                      <div className="pb-3"><div className="text-xs font-semibold text-gray-700">Application Received</div><div className="text-[0.625rem] text-gray-400">{row.dateAssigned} · Registration Officer</div></div>
                     </div>
                     <div className="flex gap-3">
                       <div className="flex flex-col items-center"><div className="h-2 w-2 rounded-full bg-green-500"></div><div className="w-px h-full bg-gray-200 mt-1"></div></div>
-                      <div className="pb-3"><div className="text-xs font-semibold text-gray-700">Biometric Enrollment</div><div className="text-[10px] text-gray-400">{row.dateAssigned} · Biometric Officer</div></div>
+                      <div className="pb-3"><div className="text-xs font-semibold text-gray-700">Biometric Enrollment</div><div className="text-[0.625rem] text-gray-400">{row.dateAssigned} · Biometric Officer</div></div>
                     </div>
                     <div className="flex gap-3">
                       <div className="flex flex-col items-center"><div className="h-2 w-2 rounded-full bg-green-500"></div><div className="w-px h-full bg-gray-200 mt-1"></div></div>
-                      <div className="pb-3"><div className="text-xs font-semibold text-gray-700">Assessment Review</div><div className="text-[10px] text-gray-400">{row.dateAssigned} · {row.assignedOfficer}</div></div>
+                      <div className="pb-3"><div className="text-xs font-semibold text-gray-700">Assessment Review</div><div className="text-[0.625rem] text-gray-400">{row.dateAssigned} · {row.assignedOfficer}</div></div>
                     </div>
                     <div className="flex gap-3">
                       <div className="flex flex-col items-center"><div className="h-2 w-2 rounded-full bg-amber-500"></div></div>
-                      <div><div className="text-xs font-semibold text-gray-700">Adjudication Review</div><div className="text-[10px] text-gray-400">Pending · Approver</div></div>
+                      <div><div className="text-xs font-semibold text-gray-700">Adjudication Review</div><div className="text-[0.625rem] text-gray-400">Pending · Approver</div></div>
                     </div>
                   </div>
                 </div>

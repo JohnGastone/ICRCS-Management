@@ -527,7 +527,7 @@ export default function Reports() {
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-1.5">
                             <div className="flex items-center gap-1">
-                              <select value={downloadFormat} onChange={e => setDownloadFormat(e.target.value)} onClick={e => e.stopPropagation()} className="text-[10px] px-1.5 py-0.5 rounded border border-gray-200 bg-white text-gray-600 focus:outline-none cursor-pointer">
+                              <select value={downloadFormat} onChange={e => setDownloadFormat(e.target.value)} onClick={e => e.stopPropagation()} className="text-[0.625rem] px-1.5 py-0.5 rounded border border-gray-200 bg-white text-gray-600 focus:outline-none cursor-pointer">
                                 <option value="csv">CSV</option>
                                 <option value="excel">Excel</option>
                                 <option value="pdf">PDF</option>
@@ -593,10 +593,10 @@ export default function Reports() {
                                   <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
                                     <div>
                                       <p className="text-xs font-bold text-gray-900">{report.title} — {datePeriod === 'daily' ? 'Daily' : datePeriod === 'weekly' ? 'Weekly' : datePeriod === 'monthly' ? 'Monthly' : datePeriod === 'annual' ? 'Annual' : 'Custom Range'} Report</p>
-                                      <p className="text-[10px] text-gray-400 mt-0.5">Generated on 15-Jun-2026</p>
+                                      <p className="text-[0.625rem] text-gray-400 mt-0.5">Generated on 15-Jun-2026</p>
                                     </div>
                                     <div className="flex items-center gap-1.5">
-                                      <select value={downloadFormat} onChange={e => setDownloadFormat(e.target.value)} className="text-[10px] px-1.5 py-0.5 rounded border border-gray-200 bg-white text-gray-600 focus:outline-none cursor-pointer">
+                                      <select value={downloadFormat} onChange={e => setDownloadFormat(e.target.value)} className="text-[0.625rem] px-1.5 py-0.5 rounded border border-gray-200 bg-white text-gray-600 focus:outline-none cursor-pointer">
                                         <option value="csv">CSV</option>
                                         <option value="excel">Excel</option>
                                         <option value="pdf">PDF</option>
@@ -610,7 +610,7 @@ export default function Reports() {
                                     <div className="grid grid-cols-3 gap-2 mb-3">
                                       {generatedReport.data.summary.map((s, i) => (
                                         <div key={i} className="bg-gray-50 rounded-lg p-2.5 text-center">
-                                          <p className="text-[10px] text-gray-500 uppercase tracking-wide">{s.label}</p>
+                                          <p className="text-[0.625rem] text-gray-500 uppercase tracking-wide">{s.label}</p>
                                           <p className="text-sm font-bold text-gray-900 mt-0.5">{s.value}</p>
                                         </div>
                                       ))}
@@ -637,7 +637,7 @@ export default function Reports() {
                                     </div>
                                     {generatedReport.data.rows.length > rowsPerPage && (
                                       <div className="flex items-center justify-between pt-3 mt-2 border-t border-gray-100">
-                                        <span className="text-[10px] text-gray-400">Showing {Math.min((reportPage - 1) * rowsPerPage + 1, generatedReport.data.rows.length)}-{Math.min(reportPage * rowsPerPage, generatedReport.data.rows.length)} of {generatedReport.data.rows.length}</span>
+                                        <span className="text-[0.625rem] text-gray-400">Showing {Math.min((reportPage - 1) * rowsPerPage + 1, generatedReport.data.rows.length)}-{Math.min(reportPage * rowsPerPage, generatedReport.data.rows.length)} of {generatedReport.data.rows.length}</span>
                                         <div className="flex items-center gap-1">
                                           <button onClick={() => setReportPage(p => Math.max(1, p - 1))} disabled={reportPage === 1} className="p-1 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
                                             <ChevronLeft className="h-3.5 w-3.5" />
