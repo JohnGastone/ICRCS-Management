@@ -62,7 +62,7 @@ const colors = {
 
 const fontFamily = {
   sans: [
-    'Inter',
+    'Montserrat',
     'system-ui',
     '-apple-system',
     'BlinkMacSystemFont',

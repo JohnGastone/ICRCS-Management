@@ -10,7 +10,6 @@ export const menuItems = [
   { path: '/internal/approve-decision', label: 'Approve Decision', icon: Gavel, roles: ['registration_officer','assessor','approver','admin'] },
   { path: '/internal/escalate-case', label: 'Escalation Case', icon: AlertTriangle, roles: ['registration_officer','assessor','approver','admin'] },
   { path: '/internal/adjudication', label: 'Adjudication', icon: Scale, roles: ['registration_officer','assessor','approver','admin'] },
-  { path: '/internal/escalation', label: 'Escalation Cases', icon: AlertTriangle, roles: ['approver','admin','management'] },
   { path: '/internal/enquiries', label: 'Enquiry', icon: Search, roles: ['registration_officer','assessor','approver','etd_officer','admin','management'] },
   { path: '/internal/reports', label: 'Reports', icon: BarChart3, roles: ['registration_officer','assessor','approver','etd_officer','admin','management'] },
 ];

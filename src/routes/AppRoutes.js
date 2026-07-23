@@ -8,7 +8,6 @@ import Assessment from '../features/assessment/pages/Assessment';
 import Adjudication from '../features/adjudication/pages/Adjudication';
 import ApproveDecision from '../features/statusDetermination/pages/ApproveDecision';
 import EscalateCase from '../features/escalateCase/pages/EscalateCase';
-import EscalationCases from '../features/escalation/pages/EscalationCases';
 import Enquiries from '../features/enquiries/pages/Enquiries';
 import Reports from '../features/reports/pages/Reports';
 
@@ -27,7 +26,6 @@ export default function AppRoutes() {
       <Route path="/internal/adjudication" element={<ProtectedRoute allowedRoles={APPROVER_ROLES}><Adjudication /></ProtectedRoute>} />
       <Route path="/internal/approve-decision" element={<ProtectedRoute allowedRoles={APPROVER_ROLES}><ApproveDecision /></ProtectedRoute>} />
       <Route path="/internal/escalate-case" element={<ProtectedRoute allowedRoles={APPROVER_ROLES}><EscalateCase /></ProtectedRoute>} />
-      <Route path="/internal/escalation" element={<ProtectedRoute allowedRoles={['approver','admin','management']}><EscalationCases /></ProtectedRoute>} />
       <Route path="/internal/enquiries" element={<ProtectedRoute allowedRoles={ALL_ROLES}><Enquiries /></ProtectedRoute>} />
       <Route path="/internal/reports" element={<ProtectedRoute allowedRoles={ALL_ROLES}><Reports /></ProtectedRoute>} />
       <Route path="/" element={<Navigate to="/internal/dashboard" replace />} />
