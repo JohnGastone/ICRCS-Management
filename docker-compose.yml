@@ -8,7 +8,7 @@
 services:
   web:
     container_name: icrcs-mgmt-portal
-    image: 10.248.0.5:30016/icrcs-mgmt-portal:v1.0.0
+    image: 10.248.0.7:30000/icrcs-mgmt-portal:v1.0.1
     build:
       context: .
       dockerfile: Dockerfile

@@ -44,10 +44,10 @@ export default function Login() {
           {/* Header */}
           <div className="flex items-center gap-5 mb-16">
             <div className="h-20 w-20 rounded-2xl bg-icrcs-gold flex items-center justify-center shadow-lg overflow-hidden">
-              <img src={logo} alt="ICRCS Logo" className="h-16 w-16 object-contain" />
+              <img src={logo} alt="CRCS Logo" className="h-16 w-16 object-contain" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-white tracking-tight">ICRCS</h1>
+              <h1 className="text-3xl font-bold text-white tracking-tight">CRCS</h1>
               <p className="text-sm text-white/60 uppercase tracking-[0.2em] font-medium">Government Portal</p>
             </div>
           </div>
@@ -56,7 +56,7 @@ export default function Login() {
           <div className="mb-10">
             <p className="text-white/90 text-2xl font-light mb-2">Welcome to the</p>
             <h2 className="text-3xl xl:text-4xl font-bold text-icrcs-gold leading-tight mb-6">
-              Immigration Central Registration<br />and Citizenship System
+              Central Registration<br />and Citizenship System
             </h2>
             <p className="text-white/70 text-sm leading-relaxed max-w-md">
               A secure and modern platform built for the management of immigration status
@@ -72,7 +72,7 @@ export default function Login() {
               </div>
               <div>
                 <p className="text-white text-xs font-semibold">Secure Access</p>
-                <p className="text-white/50 text-[10px]">Role-based control</p>
+                <p className="text-white/50 text-[0.625rem]">Role-based control</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -81,7 +81,7 @@ export default function Login() {
               </div>
               <div>
                 <p className="text-white text-xs font-semibold">Case Management</p>
-                <p className="text-white/50 text-[10px]">End-to-end processing</p>
+                <p className="text-white/50 text-[0.625rem]">End-to-end processing</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -90,15 +90,15 @@ export default function Login() {
               </div>
               <div>
                 <p className="text-white text-xs font-semibold">Biometric Data</p>
-                <p className="text-white/50 text-[10px]">Digital enrollment</p>
+                <p className="text-white/50 text-[0.625rem]">Digital enrollment</p>
               </div>
             </div>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="relative z-10 text-white/40 text-[11px]">
-          &copy; 2026 Immigration Central Registration and Citizenship System. All rights reserved. Version 1.0.0
+        <div className="relative z-10 text-white/40 text-[0.6875rem]">
+          &copy; 2026 Central Registration and Citizenship System. All rights reserved. Version 1.0.0
         </div>
       </div>
 
@@ -108,10 +108,10 @@ export default function Login() {
           {/* Mobile header (visible only on small screens) */}
           <div className="lg:hidden flex items-center justify-center gap-3 mb-8">
             <div className="h-14 w-14 rounded-xl bg-icrcs-navy flex items-center justify-center overflow-hidden">
-              <img src={logo} alt="ICRCS Logo" className="h-11 w-11 object-contain" />
+              <img src={logo} alt="CRCS Logo" className="h-11 w-11 object-contain" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-icrcs-navy">ICRCS</h1>
+              <h1 className="text-2xl font-bold text-icrcs-navy">CRCS</h1>
               <p className="text-sm text-muted uppercase tracking-wider">Government Portal</p>
             </div>
           </div>
@@ -183,7 +183,7 @@ export default function Login() {
               </button>
             </div>
 
-            <div className="mt-5 pt-5 border-t border-gray-100 text-center text-[11px] text-gray-400">
+            <div className="mt-5 pt-5 border-t border-gray-100 text-center text-[0.6875rem] text-gray-400">
               <p>Authorized personnel only. All access is logged and audited.</p>
             </div>
           </div>

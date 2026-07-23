@@ -1,0 +1,807 @@
+{
+  "info": {
+    "_postman_id": "07ec2613-7e93-489f-aad4-ddc364031d84",
+    "name": "ICRCS Management — Assessment & Approval",
+    "description": "Base URL: http://10.232.0.12:8081/api\n\n== Auth ==\nAll requests require a Bearer token from the User Management API.\nSet {{officer_token}} before running.\n\n== Workflow ==\n1. Stage 9 completes in icrcs-api → CaseAssignment auto-created (PENDING_ENROLLMENT)\n2. POST /init — manually create a case if needed\n3. POST /assign — assign case to an assessor\n4. POST /enroll — mock biometric (PENDING_ENROLLMENT → PENDING_ASSESSMENT)\n5. POST /start-assessment — assessor opens case (PENDING_ASSESSMENT → UNDER_ASSESSMENT)\n6. POST /assess — submit recommendation (→ ASSESSMENT_COMPLETE)\n7. POST /decide — approver submits final decision\n\n== Status flow ==\nPENDING_ENROLLMENT → PENDING_ASSESSMENT → UNDER_ASSESSMENT → ASSESSMENT_COMPLETE → APPROVED | REJECTED | ESCALATED\n\nAuto-set variables: case_no",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "40697580"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.code === 1 && res.data) {",
+                  "    pm.collectionVariables.set('officer_token', res.data.access_token);",
+                  "    pm.collectionVariables.set('refresh_token', res.data.refresh_token);",
+                  "    console.log('officer_token saved');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"christian.mwachiluwi@immigration.go.tz\",\n    \"password\": \"your_password\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Login with officer credentials.\nAuto-saves {{officer_token}} and {{refresh_token}}.\nNo Bearer token needed for this request."
+          },
+          "response": []
+        },
+        {
+          "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.code === 1 && res.data) {",
+                  "    pm.collectionVariables.set('officer_token', res.data.access_token);",
+                  "    pm.collectionVariables.set('refresh_token', res.data.refresh_token);",
+                  "    console.log('tokens rotated');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"refresh_token\": \"{{refresh_token}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/auth/refresh",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "auth",
+                "refresh"
+              ]
+            },
+            "description": "Refresh expired access token.\nAuto-saves new {{officer_token}} and {{refresh_token}}."
+          },
+          "response": []
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"refresh_token\": \"{{refresh_token}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/auth/logout",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "auth",
+                "logout"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Desk (Enrollment)",
+      "item": [
+        {
+          "name": "Enrollment Queue",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/v1/management/cases/enrollment?page=0&size=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "management",
+                "cases",
+                "enrollment"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "20"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Walk-in queue — all cases in PENDING_ENROLLMENT status, ordered oldest first (FIFO).\nDesk officer uses this to see who is waiting for biometric enrollment.\nOptional: search by caseNo or subjectId."
+          },
+          "response": []
+        },
+        {
+          "name": "Lookup by SubjectId",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.success && res.data && res.data.caseNo) {",
+                  "    pm.collectionVariables.set('case_no', res.data.caseNo);",
+                  "    console.log('case_no set to', res.data.caseNo);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/v1/management/cases/by-subject/{{subject_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "management",
+                "cases",
+                "by-subject",
+                "{{subject_id}}"
+              ]
+            },
+            "description": "Officer enters the applicant's subjectId → returns full case detail regardless of status.\nAlso auto-saves {{case_no}} so subsequent requests (enroll, assign, etc.) work immediately.\n\nThis is the first step when an applicant walks in and hands over their subjectId."
+          },
+          "response": []
+        },
+        {
+          "name": "New Request",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/v1/management//{caseNo}/applicant",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "management",
+                "",
+                "{caseNo}",
+                "applicant"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Queues",
+      "item": [
+        {
+          "name": "Assessment Queue",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/v1/management/cases/assessment?page=0&size=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "management",
+                "cases",
+                "assessment"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "20"
+                },
+                {
+                  "key": "status",
+                  "value": "PENDING_ASSESSMENT",
+                  "disabled": true
+                },
+                {
+                  "key": "priority",
+                  "value": "HIGH",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
+                  "value": "ICRCS-2026",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Lists cases in PENDING_ASSESSMENT, UNDER_ASSESSMENT, ASSESSMENT_COMPLETE.\nOptional query params: status, priority (HIGH|MEDIUM|LOW), search (caseNo or subjectId)."
+          },
+          "response": []
+        },
+        {
+          "name": "Approval Queue",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/v1/management/cases/approval?page=0&size=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "management",
+                "cases",
+                "approval"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "20"
+                },
+                {
+                  "key": "status",
+                  "value": "ASSESSMENT_COMPLETE",
+                  "disabled": true
+                },
+                {
+                  "key": "priority",
+                  "value": "HIGH",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Lists cases in ASSESSMENT_COMPLETE, APPROVED, REJECTED, ESCALATED."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Case",
+      "item": [
+        {
+          "name": "Case Detail",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/v1/management/cases/{{case_no}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "management",
+                "cases",
+                "{{case_no}}"
+              ]
+            },
+            "description": "Returns full case detail: case metadata, person summary, latest assessment record, latest decision record."
+          },
+          "response": []
+        },
+        {
+          "name": "Init Case (manual)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.success && res.data && res.data.caseNo) {",
+                  "    pm.collectionVariables.set('case_no', res.data.caseNo);",
+                  "    console.log('case_no set to', res.data.caseNo);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"subjectId\": \"{{subject_id}}\",\n    \"priority\": \"MEDIUM\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/management/cases/init",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "management",
+                "cases",
+                "init"
+              ]
+            },
+            "description": "Manually create a case assignment after Stage 9 declaration.\nNormally called automatically by icrcs-api when Stage 9 completes.\nAuto-saves {{case_no}}."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Officer Actions",
+      "item": [
+        {
+          "name": "Assign Officer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"officerUserId\": \"USR-001\",\n    \"officerName\": \"John Massawe\",\n    \"priority\": \"HIGH\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/management/cases/{{case_no}}/assign",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "management",
+                "cases",
+                "{{case_no}}",
+                "assign"
+              ]
+            },
+            "description": "Assigns an officer to a case. Case must be in PENDING_ENROLLMENT or PENDING_ASSESSMENT.\npriority: HIGH | MEDIUM | LOW (defaults to MEDIUM if omitted)."
+          },
+          "response": []
+        },
+        {
+          "name": "Enroll (Mock Biometric)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/v1/management/cases/{{case_no}}/enroll",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "management",
+                "cases",
+                "{{case_no}}",
+                "enroll"
+              ]
+            },
+            "description": "Marks biometric enrollment complete.\nFlips status: PENDING_ENROLLMENT → PENDING_ASSESSMENT (in both CaseAssignment and RegistrationTrace).\n409 if case is not in PENDING_ENROLLMENT."
+          },
+          "response": []
+        },
+        {
+          "name": "Start Assessment",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/v1/management/cases/{{case_no}}/start-assessment",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "management",
+                "cases",
+                "{{case_no}}",
+                "start-assessment"
+              ]
+            },
+            "description": "Called when an assessor opens a case to begin working on it.\nFlips status: PENDING_ASSESSMENT → UNDER_ASSESSMENT.\n409 if case is not in PENDING_ASSESSMENT."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Assessment",
+      "item": [
+        {
+          "name": "Assess — Recommend APPROVE",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"checklist\": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],\n    \"findings\": \"All documents verified and are authentic. Applicant meets all criteria.\",\n    \"notes\": \"No anomalies detected.\",\n    \"recommendation\": \"APPROVE\",\n    \"proposedFinalStatus\": \"CITIZEN\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/management/cases/{{case_no}}/assess",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "management",
+                "cases",
+                "{{case_no}}",
+                "assess"
+              ]
+            },
+            "description": "Submit assessment with APPROVE recommendation.\nproposedFinalStatus required: CITIZEN | MIGRANT | REFUGEE | ASYLUM_SEEKER | ILLEGAL_MIGRANT | LEGAL_MIGRANT\nFlips status to ASSESSMENT_COMPLETE."
+          },
+          "response": []
+        },
+        {
+          "name": "Assess — Recommend REJECT",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"checklist\": [0, 1, 3],\n    \"findings\": \"Document discrepancies found. Date of birth on passport does not match birth certificate.\",\n    \"notes\": \"Applicant was unable to explain the discrepancy.\",\n    \"recommendation\": \"REJECT\",\n    \"reason\": \"Identity documents contain conflicting date of birth information.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/management/cases/{{case_no}}/assess",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "management",
+                "cases",
+                "{{case_no}}",
+                "assess"
+              ]
+            },
+            "description": "Submit assessment with REJECT recommendation.\nreason is required."
+          },
+          "response": []
+        },
+        {
+          "name": "Assess — Recommend ESCALATE",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"checklist\": [0, 1, 2, 4],\n    \"findings\": \"Case involves dual nationality claim requiring legal review.\",\n    \"notes\": \"Beyond standard assessment scope.\",\n    \"recommendation\": \"ESCALATE\",\n    \"reason\": \"Dual nationality legal complexity requires departmental review.\",\n    \"escalateToDepartment\": \"Legal Affairs Department\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/management/cases/{{case_no}}/assess",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "management",
+                "cases",
+                "{{case_no}}",
+                "assess"
+              ]
+            },
+            "description": "Submit assessment with ESCALATE recommendation.\nreason and escalateToDepartment are both required."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Approval",
+      "item": [
+        {
+          "name": "Decide — APPROVE as CITIZEN",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"decision\": \"APPROVE\",\n    \"finalStatus\": \"CITIZEN\",\n    \"notes\": \"Assessment recommendation accepted. Applicant qualifies for citizenship.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/management/cases/{{case_no}}/decide",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "management",
+                "cases",
+                "{{case_no}}",
+                "decide"
+              ]
+            },
+            "description": "Final approval as CITIZEN.\nfinalStatus: CITIZEN | MIGRANT | REFUGEE | ASYLUM_SEEKER | ILLEGAL_MIGRANT | LEGAL_MIGRANT\nWrites finalStatus to RegistrationTrace."
+          },
+          "response": []
+        },
+        {
+          "name": "Decide — APPROVE as LEGAL_MIGRANT",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"decision\": \"APPROVE\",\n    \"finalStatus\": \"LEGAL_MIGRANT\",\n    \"documentType\": \"VISA\",\n    \"notes\": \"Applicant approved as legal migrant. Work visa to be issued.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/management/cases/{{case_no}}/decide",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "management",
+                "cases",
+                "{{case_no}}",
+                "decide"
+              ]
+            },
+            "description": "Approval as LEGAL_MIGRANT — documentType is required.\ndocumentType: VISA | PERMIT | PASS"
+          },
+          "response": []
+        },
+        {
+          "name": "Decide — APPROVE as REFUGEE",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"decision\": \"APPROVE\",\n    \"finalStatus\": \"REFUGEE\",\n    \"notes\": \"Applicant meets refugee status criteria under the 1951 Convention.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/management/cases/{{case_no}}/decide",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "management",
+                "cases",
+                "{{case_no}}",
+                "decide"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Decide — REJECT",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"decision\": \"REJECT\",\n    \"reason\": \"Insufficient evidence of identity. Application does not meet eligibility requirements.\",\n    \"notes\": \"Applicant may re-apply with valid supporting documents.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/management/cases/{{case_no}}/decide",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "management",
+                "cases",
+                "{{case_no}}",
+                "decide"
+              ]
+            },
+            "description": "Reject the application. reason is required."
+          },
+          "response": []
+        },
+        {
+          "name": "Decide — RETURN TO ASSESSMENT",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"decision\": \"RETURN_TO_ASSESSMENT\",\n    \"reason\": \"Additional verification needed. Please re-check the travel history documents.\",\n    \"notes\": \"Focus on entries between 2019-2021.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/management/cases/{{case_no}}/decide",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "management",
+                "cases",
+                "{{case_no}}",
+                "decide"
+              ]
+            },
+            "description": "Returns the case to the assessment queue (PENDING_ASSESSMENT).\nreason is required."
+          },
+          "response": []
+        },
+        {
+          "name": "Decide — ESCALATE",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"decision\": \"ESCALATE\",\n    \"reason\": \"Case involves international treaty obligations requiring Director General review.\",\n    \"notes\": \"Refer to Legal Affairs and notify DG office.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/management/cases/{{case_no}}/decide",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "management",
+                "cases",
+                "{{case_no}}",
+                "decide"
+              ]
+            },
+            "description": "Escalates the case. reason is required."
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{officer_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://10.232.0.12:8081/api"
+    },
+    {
+      "key": "officer_token",
+      "value": ""
+    },
+    {
+      "key": "case_no",
+      "value": ""
+    },
+    {
+      "key": "subject_id",
+      "value": ""
+    },
+    {
+      "key": "refresh_token",
+      "value": ""
+    }
+  ]
+}

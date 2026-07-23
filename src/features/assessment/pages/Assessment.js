@@ -1,14 +1,11 @@
 import React,{useState,useEffect,useCallback}from'react';
 import{ClipboardCheck,CheckCircle,XCircle,AlertTriangle,ClipboardList,Search,ChevronDown,ArrowUpDown,FolderOpen,RotateCcw,X}from'lucide-react';
 import AssessmentWorkspace from'../components/AssessmentWorkspace';
-import{getAssessmentQueue,assessCase}from'../../../services/managementService';
+import{getAssessmentQueue,assessCase,startAssessment}from'../../../services/managementService';
+import { countryName } from '../../../utils/countries';
 
-const STATUS_LABELS={PENDING_ASSESSMENT:'Pending Assessment',UNDER_ASSESSMENT:'Under Assessment',ASSESSMENT_COMPLETE:'Assessment Complete'};
-const statusLabel=s=>STATUS_LABELS[s]||s;
-const statusBadge=s=>{const m={PENDING_ASSESSMENT:'bg-sky-50 text-sky-700 border-sky-200',UNDER_ASSESSMENT:'bg-amber-50 text-amber-700 border-amber-200',ASSESSMENT_COMPLETE:'bg-green-50 text-green-700 border-green-200'};return m[s]||'bg-gray-50 text-gray-600 border-gray-200'};
-const PRIORITY_LABELS={HIGH:'High',MEDIUM:'Medium',LOW:'Low'};
-const priorityLabel=p=>PRIORITY_LABELS[p]||p;
-const priorityBadge=p=>{const m={HIGH:'bg-red-50 text-red-700 border-red-200',MEDIUM:'bg-amber-50 text-amber-700 border-amber-200',LOW:'bg-green-50 text-green-700 border-green-200'};return m[p]||'bg-gray-50 text-gray-600 border-gray-200'};
+const statusBadge=s=>{const m={'Pending Assessment':'bg-sky-50 text-sky-700 border-sky-200','Under Assessment':'bg-amber-50 text-amber-700 border-amber-200','In Progress':'bg-blue-50 text-blue-700 border-blue-200','Completed':'bg-green-50 text-green-700 border-green-200','Escalated':'bg-red-50 text-red-700 border-red-200'};return m[s]||'bg-gray-50 text-gray-600 border-gray-200'};
+const priorityBadge=p=>{const m={'High':'bg-red-50 text-red-700 border-red-200','Medium':'bg-amber-50 text-amber-700 border-amber-200','Low':'bg-green-50 text-green-700 border-green-200'};return m[p]||'bg-gray-50 text-gray-600 border-gray-200'};
 
 export default function Assessment(){
 const[assessments,setAssessments]=useState([]);
@@ -33,12 +30,12 @@ const loadQueue=useCallback(async()=>{
       caseNo:c.caseNo,
       appNo:c.subjectId,
       fullName:c.fullName,
-      nationality:c.nationalityCode,
+      nationality:countryName(c.nationalityCode),
       gender:c.sexId===1?'Male':'Female',
       dob:c.dateOfBirth,
       status:c.status,
       priority:c.priority,
-      assignedDate:c.assignedDate||c.createdAt,
+      assignedDate:c.assignedDate,
       officer:c.assignedOfficerName||'',
       registrationType:c.registrationType,
     }));
@@ -79,12 +76,21 @@ const handleSubmit=async(caseNo,formData)=>{
     loadQueue();
   }catch(e){setSuccessMsg('');setQueueError(e.message);}
 };
+const handleStartAssessment=async(caseNo)=>{
+  try{
+    await startAssessment(caseNo);
+    setSuccessMsg(`Assessment started for case ${caseNo}.`);setTimeout(()=>setSuccessMsg(''),5000);
+    setWorkspaceRow(r=>r&&r.caseNo===caseNo?{...r,status:'Under Assessment'}:r);
+    await loadQueue();
+  }catch(e){setSuccessMsg('');setQueueError(e.message);throw e;}
+};
 
 const kpis=[
 {label:'Total Assigned',value:assessments.length,color:'bg-icrcs-navy',icon:ClipboardList},
-{label:'Pending',value:assessments.filter(a=>a.status==='PENDING_ASSESSMENT').length,color:'bg-sky-500',icon:AlertTriangle},
-{label:'Under Assessment',value:assessments.filter(a=>a.status==='UNDER_ASSESSMENT').length,color:'bg-blue-500',icon:RotateCcw},
-{label:'Completed',value:assessments.filter(a=>a.status==='ASSESSMENT_COMPLETE').length,color:'bg-green-500',icon:CheckCircle},
+{label:'Pending',value:assessments.filter(a=>a.status==='Pending Assessment').length,color:'bg-sky-500',icon:AlertTriangle},
+{label:'In Progress',value:assessments.filter(a=>a.status==='In Progress'||a.status==='Under Assessment').length,color:'bg-blue-500',icon:RotateCcw},
+{label:'Completed',value:assessments.filter(a=>a.status==='Completed').length,color:'bg-green-500',icon:CheckCircle},
+{label:'Escalated',value:assessments.filter(a=>a.status==='Escalated').length,color:'bg-red-500',icon:XCircle},
 ];
 
 return(
@@ -104,8 +110,8 @@ return(
   <div className="p-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center gap-3">
    <div className="relative flex-1 max-w-sm"><Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/><input type="text" value={search} onChange={e=>{setSearch(e.target.value);setCurrentPage(1);}} placeholder="Search case, app no, or name..." className="w-full pl-9 pr-4 py-2 rounded-xl border border-gray-200 bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-icrcs-navy/20 focus:border-icrcs-navy transition-all"/></div>
    <div className="flex items-center gap-2">
-    <div className="relative"><select value={statusFilter} onChange={e=>{setStatusFilter(e.target.value);setCurrentPage(1);}} className="appearance-none pl-3 pr-8 py-2 rounded-xl border border-gray-200 bg-gray-50 text-xs font-medium text-gray-600 focus:outline-none focus:ring-2 focus:ring-icrcs-navy/20 cursor-pointer"><option value="All">All Status</option><option value="PENDING_ASSESSMENT">Pending Assessment</option><option value="UNDER_ASSESSMENT">Under Assessment</option><option value="ASSESSMENT_COMPLETE">Assessment Complete</option></select><ChevronDown className="h-3.5 w-3.5 text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"/></div>
-    <div className="relative"><select value={priorityFilter} onChange={e=>{setPriorityFilter(e.target.value);setCurrentPage(1);}} className="appearance-none pl-3 pr-8 py-2 rounded-xl border border-gray-200 bg-gray-50 text-xs font-medium text-gray-600 focus:outline-none focus:ring-2 focus:ring-icrcs-navy/20 cursor-pointer"><option value="All">All Priority</option><option value="HIGH">High</option><option value="MEDIUM">Medium</option><option value="LOW">Low</option></select><ChevronDown className="h-3.5 w-3.5 text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"/></div>
+    <div className="relative"><select value={statusFilter} onChange={e=>{setStatusFilter(e.target.value);setCurrentPage(1);}} className="appearance-none pl-3 pr-8 py-2 rounded-xl border border-gray-200 bg-gray-50 text-xs font-medium text-gray-600 focus:outline-none focus:ring-2 focus:ring-icrcs-navy/20 cursor-pointer"><option value="All">All Status</option><option value="Pending Assessment">Pending</option><option value="Under Assessment">Under Assessment</option><option value="In Progress">In Progress</option><option value="Completed">Completed</option><option value="Escalated">Escalated</option></select><ChevronDown className="h-3.5 w-3.5 text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"/></div>
+    <div className="relative"><select value={priorityFilter} onChange={e=>{setPriorityFilter(e.target.value);setCurrentPage(1);}} className="appearance-none pl-3 pr-8 py-2 rounded-xl border border-gray-200 bg-gray-50 text-xs font-medium text-gray-600 focus:outline-none focus:ring-2 focus:ring-icrcs-navy/20 cursor-pointer"><option value="All">All Priority</option><option value="High">High</option><option value="Medium">Medium</option><option value="Low">Low</option></select><ChevronDown className="h-3.5 w-3.5 text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"/></div>
    </div>
   </div>
 
@@ -125,8 +131,8 @@ return(
       <td className="px-4 py-3 font-mono text-gray-700">{row.caseNo}</td>
       <td className="px-4 py-3 font-mono text-gray-700">{row.appNo}</td>
       <td className="px-4 py-3"><div className="font-medium text-sm text-gray-800">{row.fullName}</div><div className="text-sm text-gray-400">{row.nationality}</div></td>
-      <td className="px-4 py-3"><span className={`text-sm px-2 py-0.5 rounded-full border font-medium ${statusBadge(row.status)}`}>{statusLabel(row.status)}</span></td>
-      <td className="px-4 py-3"><span className={`text-sm px-2 py-0.5 rounded-full border font-medium ${priorityBadge(row.priority)}`}>{priorityLabel(row.priority)}</span></td>
+      <td className="px-4 py-3"><span className={`text-sm px-2 py-0.5 rounded-full border font-medium ${statusBadge(row.status)}`}>{row.status}</span></td>
+      <td className="px-4 py-3"><span className={`text-sm px-2 py-0.5 rounded-full border font-medium ${priorityBadge(row.priority)}`}>{row.priority}</span></td>
       <td className="px-4 py-3 text-sm text-gray-500">{row.assignedDate}</td>
       <td className="px-4 py-3 text-right"><button onClick={()=>openWorkspace(row)} className="px-2.5 py-1.5 rounded-lg bg-icrcs-navy text-white text-sm font-semibold hover:bg-icrcs-navy-light transition-colors shadow-sm flex items-center gap-1 ml-auto"><FolderOpen className="h-3 w-3"/>Open</button></td>
      </tr>)}
@@ -136,22 +142,22 @@ return(
   </div>
 
   <div className="p-4 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-   <div className="flex items-center gap-2 text-[11px] text-gray-500">
+   <div className="flex items-center gap-2 text-[0.6875rem] text-gray-500">
     <span>Rows:</span>
-    <div className="relative"><select value={rowsPerPage} onChange={e=>{setRowsPerPage(Number(e.target.value));setCurrentPage(1);}} className="appearance-none pl-2 pr-6 py-1 rounded-lg border border-gray-200 bg-white text-[11px] font-medium text-gray-600 focus:outline-none cursor-pointer">{rowsPerPageOptions.map(o=><option key={o} value={o}>{o}</option>)}</select><ChevronDown className="h-3 w-3 text-gray-400 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none"/></div>
+    <div className="relative"><select value={rowsPerPage} onChange={e=>{setRowsPerPage(Number(e.target.value));setCurrentPage(1);}} className="appearance-none pl-2 pr-6 py-1 rounded-lg border border-gray-200 bg-white text-[0.6875rem] font-medium text-gray-600 focus:outline-none cursor-pointer">{rowsPerPageOptions.map(o=><option key={o} value={o}>{o}</option>)}</select><ChevronDown className="h-3 w-3 text-gray-400 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none"/></div>
     <span>Showing {sorted.length>0?startIndex+1:0} to {Math.min(startIndex+rowsPerPage,sorted.length)} of {sorted.length}</span>
    </div>
    <div className="flex items-center gap-1.5">
-    <button onClick={()=>goToPage(1)} disabled={safePage<=1} className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-[11px] font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-40">First</button>
-    <button onClick={()=>goToPage(safePage-1)} disabled={safePage<=1} className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-[11px] font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-40">Prev</button>
-    <span className="px-3 py-1.5 rounded-lg bg-gray-50 border border-gray-200 text-[11px] font-semibold text-gray-700">{safePage}/{totalPages}</span>
-    <button onClick={()=>goToPage(safePage+1)} disabled={safePage>=totalPages} className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-[11px] font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-40">Next</button>
-    <button onClick={()=>goToPage(totalPages)} disabled={safePage>=totalPages} className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-[11px] font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-40">Last</button>
+    <button onClick={()=>goToPage(1)} disabled={safePage<=1} className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-[0.6875rem] font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-40">First</button>
+    <button onClick={()=>goToPage(safePage-1)} disabled={safePage<=1} className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-[0.6875rem] font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-40">Prev</button>
+    <span className="px-3 py-1.5 rounded-lg bg-gray-50 border border-gray-200 text-[0.6875rem] font-semibold text-gray-700">{safePage}/{totalPages}</span>
+    <button onClick={()=>goToPage(safePage+1)} disabled={safePage>=totalPages} className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-[0.6875rem] font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-40">Next</button>
+    <button onClick={()=>goToPage(totalPages)} disabled={safePage>=totalPages} className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-[0.6875rem] font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-40">Last</button>
    </div>
   </div>
  </div>
 
- <AssessmentWorkspace row={workspaceRow} isOpen={workspaceOpen} onClose={closeWorkspace} onSubmit={handleSubmit}/>
+ <AssessmentWorkspace row={workspaceRow} isOpen={workspaceOpen} onClose={closeWorkspace} onSubmit={handleSubmit} onStartAssessment={handleStartAssessment}/>
 </div>
 );
 }

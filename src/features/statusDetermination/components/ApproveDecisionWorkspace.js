@@ -24,18 +24,13 @@ const history=[
 ];
 
 const departmentOptions=[
-  'Border Management and Control'
+  'Citizenship department',
+  'Border Management and Control',
+  'Legal Department'
 ];
 
-// value must match ApprovalHandler.VALID_FINAL_STATUSES in icrcs-management exactly
 const finalStatuses=[
-  {value:'CITIZEN',label:'CITIZEN'},
-  {value:'FOREIGNER',label:'FOREIGNER'},
-  {value:'ASYLUM SEEKER',label:'ASYLUM SEEKER'},
-  {value:'REFUGEE',label:'REFUGEE'},
-  {value:'IMMIGRANT_WITH_UNDETERMINED_STATUS',label:'IMMIGRANT WITH UNDETERMINED STATUS'},
-  {value:'VOLUNTARY RETURNEE',label:'VOLUNTARY RETURNEE'},
-  {value:'MIGRANT',label:'MIGRANT'},
+  'CITIZEN','MIGRANT','REFUGEE','ASYLUM_SEEKER','ILLEGAL_MIGRANT','LEGAL_MIGRANT'
 ];
 
 function SectionCard({title,icon,children,defaultOpen=true}){
@@ -70,7 +65,6 @@ function joinName(...parts){return parts.filter(Boolean).join(' ');}
 function joinPlace(...parts){return parts.filter(Boolean).join(', ')||'—';}
 
 function mapReviewToApplicant(r){
-  if(!r) return {};
   const p=r.personalDetails||{};
   const birth=r.birthDetails||{};
   const addrs=r.addresses||[];
@@ -79,47 +73,17 @@ function mapReviewToApplicant(r){
   const father=(r.parents||[]).find(x=>x.parentType==='FATHER');
   const mother=(r.parents||[]).find(x=>x.parentType==='MOTHER');
   const emp=r.employment;
-  const mapParent = x => {
-    if (!x) return null;
-    let country = x.residenceLocation?.country || x.residenceCountry || '';
-    let region = x.residenceLocation?.region || '';
-    let district = x.residenceLocation?.district || '';
-    let ward = x.residenceLocation?.ward || '';
-    let street = x.residenceLocation?.street || '';
-    if (!region && !district && typeof x.residence === 'string' && x.residence.includes(',')) {
-      const parts = x.residence.split(',').map(s => s.trim());
-      if (parts.length > 0) country = parts[parts.length - 1];
-      if (parts.length > 1) region = parts[parts.length - 2];
-      if (parts.length > 2) district = parts[parts.length - 3];
-      if (parts.length > 3) ward = parts[parts.length - 4];
-      if (parts.length > 4) street = parts.slice(0, parts.length - 4).join(', ');
-    } else if (!region && !district && typeof x.residence === 'string') {
-      street = x.residence;
-    }
-    return {
-      fullName: joinName(x.firstName, x.middleName, x.lastName) || x.fullName,
-      dob: x.dateOfBirth || x.dob,
-      phone: x.phoneNumber || x.phone || '—',
-      nationality: x.nationality,
-      residenceCountry: country,
-      residenceRegion: region,
-      residenceDistrict: district,
-      residenceWard: ward,
-      residenceStreet: street,
-      residence: typeof x.residence === 'string' ? x.residence : joinPlace(district, x.residenceCity || region, country),
-    };
-  };
-  const mapKin=x=>({
+  const mapParent=(x,gender)=>x?{
     fullName:joinName(x.firstName,x.middleName,x.lastName),
-    gender:x.sex,dob:x.dateOfBirth,
-    relationship:x.relationshipType,
+    dob:x.dateOfBirth,gender,
     phone:x.phoneNumber||'—',
     nationality:x.nationality,
+    placeOfBirth:joinPlace(x.residenceLocation?.district,x.residenceCity,x.residenceCountry),
+    village:x.residenceLocation?.ward||'—',
     residence:joinPlace(x.residenceLocation?.district,x.residenceCity,x.residenceCountry),
-  });
+  }:null;
   const mapAddr=a=>a?{
-    country:a.country||a.location?.country,
-    city:a.city,
+    country:a.country,
     region:a.location?.region,
     district:a.location?.district,
     ward:a.location?.ward,
@@ -143,26 +107,25 @@ function mapReviewToApplicant(r){
     currentAddress:mapAddr(cur),
     permanentSameAsCurrent:!perm,
     permanentAddress:mapAddr(perm),
-    father:mapParent(father),
-    mother:mapParent(mother),
-    spouses:(r.spouses||[]).map(mapKin),
-    relatives:(r.relatives||[]).map(mapKin),
-    children:(r.children||[]).map(mapKin),
+    father:mapParent(father,'Male'),
+    mother:mapParent(mother,'Female'),
     education:(r.educationList||[]).map(e=>({
       level:e.educationLevel,institution:e.schoolName,
       completionYear:e.completionYear?String(e.completionYear):'—',
-      city:joinPlace(e.city,e.country),indexNo:e.registrationNumber,
+      district:e.city||e.country||'—',indexNo:e.registrationNumber,
     })),
     employment:emp?{
       status:emp.employmentStatus,
       occupation:emp.occupationType||emp.otherOccupation||'—',
       employer:emp.organizationName||'—',
+      nationalId:'—',
     }:null,
-    documents:(r.documents||[]).map(d=>({type:d.documentType,number:d.documentNumber})),
     emergencyContacts:(r.emergencyContacts||[]).map(c=>({
       fullName:c.fullName,relationship:c.relationshipType,
-      occupation:c.occupationType||'—',gender:c.gender||'—',
-      phone:c.phoneNumber||'—',nationality:c.nationality||'—',
+      occupation:'—',dob:'—',gender:'—',
+      phone:c.phoneNumber||'—',nationality:'—',
+      placeOfBirth:joinPlace(c.residenceLocation?.district,c.residenceCity,c.country),
+      village:c.residenceLocation?.ward||'—',
       residence:joinPlace(c.residenceLocation?.district,c.residenceCity,c.country),
     })),
   };
@@ -199,7 +162,7 @@ export default function ApproveDecisionWorkspace({row,isOpen,onClose,onSubmit}){
     setReviewData(null);setApplicantData(null);setApplicantError('');setLoadingApplicant(true);
     getApplicantReview(row.caseNo)
       .then(review=>{
-        if(review){setReviewData(review);setApplicantData(mapReviewToApplicant(review));}
+        if(review){setReviewData(review);setApplicantData(review);}
         else setApplicantError('No applicant data returned.');
       })
       .catch(err=>{
@@ -254,15 +217,11 @@ export default function ApproveDecisionWorkspace({row,isOpen,onClose,onSubmit}){
   };
 
   const submit=()=>{
-    const hasPendingDocs = docFields.some(d => d.status === 'pending');
-    if (hasPendingDocs) { setActiveTab('attachments'); setToast('Please upload files for all added attachments or remove the empty slots.'); setTimeout(()=>setToast(''), 4000); return; }
-    const hasPendingDecisions = decisionAttachments.some(d => d.status === 'pending');
-    if (hasPendingDecisions) { setActiveTab('decision'); setToast('Please upload files for all decision attachments or remove the empty slots.'); setTimeout(()=>setToast(''), 4000); return; }
-
-    if(!decision){setActiveTab('decision');setToast('Select a decision.');setTimeout(()=>setToast(''),4000);return;}
-    if(decision==='escalate'&&!escalationDept){setActiveTab('decision');setToast('Select a department.');setTimeout(()=>setToast(''),4000);return;}
-    if((decision==='reject'||decision==='return'||decision==='escalate')&&!reason.trim()){setActiveTab('decision');setToast('Enter a reason.');setTimeout(()=>setToast(''),4000);return;}
-    if(decision==='approve'&&!finalStatus){setActiveTab('decision');setToast('Select a final immigration status.');setTimeout(()=>setToast(''),4000);return;}
+    if(!allDone){setToast('Complete all checklist items first.');setTimeout(()=>setToast(''),4000);return;}
+    if(!decision){setToast('Select a decision.');setTimeout(()=>setToast(''),4000);return;}
+    if(decision==='escalate'&&!escalationDept){setToast('Select a department.');setTimeout(()=>setToast(''),4000);return;}
+    if((decision==='reject'||decision==='return'||decision==='escalate')&&!reason.trim()){setToast('Enter a reason.');setTimeout(()=>setToast(''),4000);return;}
+    if(decision==='approve'&&!finalStatus){setToast('Select a final immigration status.');setTimeout(()=>setToast(''),4000);return;}
     onSubmit(row.caseNo,{
       decision:decision==='return'?'RETURN_TO_ASSESSMENT':decision.toUpperCase(),
       finalStatus:decision==='approve'?finalStatus:undefined,
@@ -279,12 +238,12 @@ export default function ApproveDecisionWorkspace({row,isOpen,onClose,onSubmit}){
     {id:'info',label:'Applicant Info',icon:<User className="h-4 w-4"/>},
     {id:'attachments',label:'Attachments',icon:<FolderOpen className="h-4 w-4"/>},
     {id:'checklist',label:'Checklist',icon:<ClipboardList className="h-4 w-4"/>},
-    {id:'decision',label:'Decision',icon:<SendHorizontal className="h-4 w-4"/>},
+    ...(!isReadOnly?[{id:'decision',label:'Decision',icon:<SendHorizontal className="h-4 w-4"/>}]:[]),
   ];
 
   return(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-0 md:p-4">
-      <div className="bg-white w-full h-full md:w-[85%] md:h-[90vh] lg:w-[75%] lg:max-w-[1100px] lg:h-auto lg:max-h-[85vh] rounded-none md:rounded-2xl border border-gray-200 shadow-2xl flex flex-col overflow-hidden">
+      <div className="bg-white w-full h-full md:w-[85%] md:h-[90vh] lg:w-[88%] lg:max-w-[90rem] lg:h-auto lg:max-h-[85vh] rounded-none md:rounded-2xl border border-gray-200 shadow-2xl flex flex-col overflow-hidden">
         {/* Header */}
         <div className="p-5 sm:p-6 border-b border-gray-100 flex items-center justify-between shrink-0 bg-white z-10">
           <div className="flex items-center gap-3">
@@ -340,11 +299,11 @@ export default function ApproveDecisionWorkspace({row,isOpen,onClose,onSubmit}){
                     <div key={d.id} className="flex items-center justify-between gap-2 p-3 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-gray-50 transition-colors">
                       <div className="flex items-center gap-2.5 min-w-0">
                         <div className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${d.isImage?'bg-blue-50':'bg-red-50'}`}>
-                          <span className={`text-[9px] font-bold uppercase ${d.isImage?'text-blue-600':'text-red-600'}`}>{d.ext}</span>
+                          <span className={`text-[0.5625rem] font-bold uppercase ${d.isImage?'text-blue-600':'text-red-600'}`}>{d.ext}</span>
                         </div>
                         <div className="min-w-0">
                           <div className="text-xs font-medium text-gray-700 truncate">{d.name}</div>
-                          <div className="text-[10px] text-gray-400">{d.attachmentType}</div>
+                          <div className="text-[0.625rem] text-gray-400">{d.attachmentType}</div>
                         </div>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
@@ -363,10 +322,10 @@ export default function ApproveDecisionWorkspace({row,isOpen,onClose,onSubmit}){
                         return(
                           <div key={d.id} className="flex items-center justify-between gap-2 p-3 rounded-xl border border-dashed border-green-300 bg-green-50/30">
                             <div className="flex items-center gap-2.5 min-w-0">
-                              <div className="h-9 w-9 rounded-lg bg-green-50 flex items-center justify-center shrink-0"><span className="text-[9px] font-bold text-green-600 uppercase">{ext||'PDF'}</span></div>
+                              <div className="h-9 w-9 rounded-lg bg-green-50 flex items-center justify-center shrink-0"><span className="text-[0.5625rem] font-bold text-green-600 uppercase">{ext||'PDF'}</span></div>
                               <div className="min-w-0">
                                 <div className="text-xs font-medium text-gray-700 truncate">{d.name||'New Document'}</div>
-                                <div className="text-[10px] text-green-600">{d.status==='ready'?'Ready':'Waiting for upload'}</div>
+                                <div className="text-[0.625rem] text-green-600">{d.status==='ready'?'Ready':'Waiting for upload'}</div>
                               </div>
                             </div>
                             <div className="flex items-center gap-1 shrink-0">
@@ -391,7 +350,7 @@ export default function ApproveDecisionWorkspace({row,isOpen,onClose,onSubmit}){
                   <button onClick={()=>fileRefs.current['new']?.click()} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-icrcs-navy text-white text-sm font-semibold hover:bg-icrcs-navy-light transition-colors shadow-sm">
                     <Upload className="h-4 w-4"/>Upload Document
                   </button>
-                  <p className="text-[11px] text-gray-400 mt-2">Supported: PDF only &middot; Max 5 MB per file</p>
+                  <p className="text-[0.6875rem] text-gray-400 mt-2">Supported: PDF only &middot; Max 5 MB per file</p>
                 </div>
               </div>
               <div className="lg:w-[45%] space-y-4">
@@ -406,8 +365,14 @@ export default function ApproveDecisionWorkspace({row,isOpen,onClose,onSubmit}){
                         <img src={previewDoc.url} alt={previewDoc.name} className="max-w-full max-h-[420px] object-contain rounded"/>
                       </div>
                     ):(()=>{const src=previewDoc.url||previewDoc.preview;return(
-                      <div className="flex-1 rounded-lg bg-gray-50 border border-gray-100 overflow-hidden flex flex-col min-h-[350px]">
-                        <iframe src={src} className="w-full flex-1 min-h-[350px] border-0" title={previewDoc.name}/>
+                      <div className="flex-1 rounded-lg bg-gray-50 border border-gray-100 p-6 flex flex-col items-center justify-center text-center min-h-[280px]">
+                        <div className="h-16 w-16 rounded-2xl bg-red-50 flex items-center justify-center mb-3"><span className="text-sm font-bold text-red-600 uppercase">{previewDoc.ext||'PDF'}</span></div>
+                        <p className="text-sm font-medium text-gray-700 mb-1">{previewDoc.name}</p>
+                        {previewDoc.attachmentType&&<p className="text-xs text-gray-400 mb-4">{previewDoc.attachmentType}</p>}
+                        {src&&<div className="flex items-center gap-2">
+                          <a href={src} target="_blank" rel="noreferrer" download={previewDoc.name} className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-500 hover:bg-white transition-colors flex items-center gap-1"><Download className="h-3 w-3"/>Download</a>
+                          <button onClick={()=>window.open(src,'_blank')} className="px-3 py-1.5 rounded-lg bg-icrcs-navy text-white text-xs font-medium hover:bg-icrcs-navy-light transition-colors">Open in Browser</button>
+                        </div>}
                       </div>
                     );})()}
                   </div>
@@ -433,7 +398,7 @@ export default function ApproveDecisionWorkspace({row,isOpen,onClose,onSubmit}){
                     const initials=item.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
                     return(
                       <li key={i} className="flex items-start gap-2.5 p-2.5 rounded-xl bg-green-50/40 border border-green-100">
-                        <div className="h-7 w-7 rounded-lg bg-green-100 flex items-center justify-center shrink-0 mt-0.5"><span className="text-[9px] font-bold text-green-700">{initials}</span></div>
+                        <div className="h-7 w-7 rounded-lg bg-green-100 flex items-center justify-center shrink-0 mt-0.5"><span className="text-[0.5625rem] font-bold text-green-700">{initials}</span></div>
                         <div className="flex-1 min-w-0"><span className="text-sm text-gray-700 leading-snug">{item}</span></div>
                         <CheckCircle className="h-4 w-4 text-green-500 shrink-0 mt-0.5" strokeWidth={2.5}/>
                       </li>
@@ -486,8 +451,8 @@ export default function ApproveDecisionWorkspace({row,isOpen,onClose,onSubmit}){
                               const ext=att.name.split('.').pop().toLowerCase();
                               return(
                                 <div key={att.id} className="flex items-center gap-2 p-2 rounded-lg border border-gray-100 bg-gray-50/50">
-                                  <div className="h-7 w-7 rounded-md bg-green-50 flex items-center justify-center shrink-0"><span className="text-[8px] font-bold text-green-600 uppercase">{ext}</span></div>
-                                  <div className="flex-1 min-w-0"><p className="text-xs text-gray-700 truncate">{att.name}</p><p className="text-[10px] text-gray-400">{att.size} &middot; {att.date}</p></div>
+                                  <div className="h-7 w-7 rounded-md bg-green-50 flex items-center justify-center shrink-0"><span className="text-[0.5rem] font-bold text-green-600 uppercase">{ext}</span></div>
+                                  <div className="flex-1 min-w-0"><p className="text-xs text-gray-700 truncate">{att.name}</p><p className="text-[0.625rem] text-gray-400">{att.size} &middot; {att.date}</p></div>
                                   <button onClick={()=>setHistoryPreviewDoc(att)} className="p-1 rounded hover:bg-white text-gray-400 hover:text-icrcs-navy transition-colors" title="View"><Eye className="h-3.5 w-3.5"/></button>
                                   <button className="p-1 rounded hover:bg-white text-gray-400 hover:text-icrcs-navy transition-colors" title="Download"><Download className="h-3.5 w-3.5"/></button>
                                 </div>
@@ -505,104 +470,83 @@ export default function ApproveDecisionWorkspace({row,isOpen,onClose,onSubmit}){
                       <div className="flex items-center gap-2"><FileText className="h-4 w-4 text-icrcs-navy"/><span className="text-xs font-semibold text-gray-700">Attachment Preview</span></div>
                       <button onClick={()=>setHistoryPreviewDoc(null)} className="p-1 rounded hover:bg-gray-200 text-gray-400"><X className="h-3.5 w-3.5"/></button>
                     </div>
-                    {(() => {
-                      const ext = historyPreviewDoc.name.split('.').pop().toLowerCase();
-                      const isImage = ['png', 'jpg', 'jpeg'].includes(ext);
-                      const isPdf = ext === 'pdf';
-                      const src = historyPreviewDoc.url;
-                      if (isImage) {
-                        return (
-                          <div className="rounded-lg bg-white border border-gray-100 p-2 flex items-center justify-center min-h-[180px]">
-                            <img src={src} alt={historyPreviewDoc.name} className="max-w-full max-h-[300px] object-contain rounded" />
-                          </div>
-                        );
-                      }
-                      if (isPdf && src) {
-                        return (
-                          <div className="rounded-lg bg-white border border-gray-100 overflow-hidden flex flex-col min-h-[300px]">
-                            <iframe src={src} className="w-full h-[300px] border-0" title={historyPreviewDoc.name} />
-                          </div>
-                        );
-                      }
-                      return (
-                        <div className="rounded-lg bg-white border border-gray-100 p-5 flex flex-col items-center justify-center text-center min-h-[180px]">
-                          <div className="h-12 w-12 rounded-xl bg-red-50 flex items-center justify-center mb-2"><span className="text-xs font-bold text-red-600 uppercase">{ext}</span></div>
-                          <p className="text-sm font-medium text-gray-700 mb-1">{historyPreviewDoc.name}</p>
-                          <p className="text-xs text-gray-400 mb-3">{historyPreviewDoc.size||''} &middot; {historyPreviewDoc.date||''}</p>
-                          <div className="flex items-center gap-2">
-                            <a href={src} target="_blank" rel="noreferrer" download={historyPreviewDoc.name} className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-500 hover:bg-white transition-colors flex items-center gap-1"><Download className="h-3 w-3"/>Download</a>
-                          </div>
-                        </div>
-                      );
-                    })()}
+                    <div className="rounded-lg bg-white border border-gray-100 p-5 flex flex-col items-center justify-center text-center min-h-[180px]">
+                      <div className="h-12 w-12 rounded-xl bg-red-50 flex items-center justify-center mb-2"><span className="text-xs font-bold text-red-600 uppercase">{historyPreviewDoc.name.split('.').pop()}</span></div>
+                      <p className="text-sm font-medium text-gray-700 mb-1">{historyPreviewDoc.name}</p>
+                      <p className="text-xs text-gray-400 mb-3">{historyPreviewDoc.size||''} &middot; {historyPreviewDoc.date||''}</p>
+                      <div className="flex items-center gap-2">
+                        <button className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-500 hover:bg-white transition-colors flex items-center gap-1"><Download className="h-3 w-3"/>Download</button>
+                        <button className="px-3 py-1.5 rounded-lg bg-icrcs-navy text-white text-xs font-medium hover:bg-icrcs-navy-light transition-colors">Open in Viewer</button>
+                      </div>
+                    </div>
                   </div>
                 )}
-              {!isReadOnly && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                  <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-                    <h4 className="text-base font-bold text-gray-800 mb-3 flex items-center gap-2"><MessageSquare className="h-4 w-4 text-icrcs-navy"/>Determination Findings</h4>
-                    <textarea ref={findingsRef} rows={3} value={findings} onChange={e=>setFindings(e.target.value)} onInput={autoResizeFindings} placeholder="Record determination findings, observations, and interview notes..." style={{minHeight:'80px'}} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-icrcs-navy/20 focus:border-icrcs-navy resize-none overflow-hidden transition-all"/>
-                    <div className="mt-4 pt-4 border-t border-gray-100">
-                      <div className="flex items-center justify-between mb-2">
-                        <h5 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Decision Attachments <span className="text-gray-400 normal-case font-normal">(Optional)</span></h5>
-                        <button onClick={addDecisionAttachment} className="flex items-center gap-1 text-xs font-medium text-icrcs-navy hover:text-icrcs-navy-light transition-colors"><Plus className="h-3 w-3"/>Add</button>
-                      </div>
-                      {decisionAttachments.length===0&&<p className="text-xs text-gray-400">No attachments added yet.</p>}
-                      <div className="space-y-2">
-                        {decisionAttachments.map(d=>{
-                          const ext=d.name.split('.').pop().toLowerCase();
-                          return(
-                            <div key={d.id} className="flex items-center justify-between gap-2 p-2.5 rounded-xl border border-gray-100 bg-gray-50/50">
-                              <div className="flex items-center gap-2 min-w-0">
-                                {d.status==='ready'?<><div className="h-7 w-7 rounded-md bg-green-50 flex items-center justify-center shrink-0"><span className="text-[8px] font-bold text-green-600 uppercase">{ext}</span></div><span className="text-xs text-gray-700 truncate">{d.name}</span><span className="text-[10px] text-green-600 shrink-0">Ready</span></>:<><div className="h-7 w-7 rounded-md bg-gray-100 flex items-center justify-center shrink-0"><FileText className="h-3 w-3 text-gray-400"/></div><span className="text-xs text-gray-400">No file selected</span></>}
-                              </div>
-                              <div className="flex items-center gap-1 shrink-0">
-                                {d.status==='pending'&&(<>
-                                  <input type="file" accept=".pdf" ref={el=>{if(el)decisionFileRef.current[d.id]=el;}} onChange={e=>handleDecisionAttachmentUpload(d.id,e)} className="hidden"/>
-                                  <button onClick={()=>decisionFileRef.current[d.id]?.click()} className="px-2 py-1 rounded-lg border border-gray-200 text-[10px] font-medium text-gray-500 hover:bg-white transition-colors">Choose</button>
-                                </>)}
-                                <button onClick={()=>removeDecisionAttachment(d.id)} className="p-1 rounded hover:bg-white text-gray-400 hover:text-red-500 transition-colors"><Trash2 className="h-3 w-3"/></button>
-                              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                  <h4 className="text-base font-bold text-gray-800 mb-3 flex items-center gap-2"><MessageSquare className="h-4 w-4 text-icrcs-navy"/>Determination Findings</h4>
+                  <textarea ref={findingsRef} rows={3} value={findings} onChange={e=>setFindings(e.target.value)} onInput={autoResizeFindings} placeholder="Record determination findings, observations, and interview notes..." style={{minHeight:'80px'}} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-icrcs-navy/20 focus:border-icrcs-navy resize-none overflow-hidden transition-all"/>
+                  <div className="mt-4 pt-4 border-t border-gray-100">
+                    <div className="flex items-center justify-between mb-2">
+                      <h5 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Decision Attachments <span className="text-gray-400 normal-case font-normal">(Optional)</span></h5>
+                      <button onClick={addDecisionAttachment} className="flex items-center gap-1 text-xs font-medium text-icrcs-navy hover:text-icrcs-navy-light transition-colors"><Plus className="h-3 w-3"/>Add</button>
+                    </div>
+                    {decisionAttachments.length===0&&<p className="text-xs text-gray-400">No attachments added yet.</p>}
+                    <div className="space-y-2">
+                      {decisionAttachments.map(d=>{
+                        const ext=d.name.split('.').pop().toLowerCase();
+                        return(
+                          <div key={d.id} className="flex items-center justify-between gap-2 p-2.5 rounded-xl border border-gray-100 bg-gray-50/50">
+                            <div className="flex items-center gap-2 min-w-0">
+                              {d.status==='ready'?<><div className="h-7 w-7 rounded-md bg-green-50 flex items-center justify-center shrink-0"><span className="text-[0.5rem] font-bold text-green-600 uppercase">{ext}</span></div><span className="text-xs text-gray-700 truncate">{d.name}</span><span className="text-[0.625rem] text-green-600 shrink-0">Ready</span></>:<><div className="h-7 w-7 rounded-md bg-gray-100 flex items-center justify-center shrink-0"><FileText className="h-3 w-3 text-gray-400"/></div><span className="text-xs text-gray-400">No file selected</span></>}
                             </div>
-                          );
-                        })}
-                      </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              {d.status==='pending'&&(<>
+                                <input type="file" accept=".pdf" ref={el=>{if(el)decisionFileRef.current[d.id]=el;}} onChange={e=>handleDecisionAttachmentUpload(d.id,e)} className="hidden"/>
+                                <button onClick={()=>decisionFileRef.current[d.id]?.click()} className="px-2 py-1 rounded-lg border border-gray-200 text-[0.625rem] font-medium text-gray-500 hover:bg-white transition-colors">Choose</button>
+                              </>)}
+                              <button onClick={()=>removeDecisionAttachment(d.id)} className="p-1 rounded hover:bg-white text-gray-400 hover:text-red-500 transition-colors"><Trash2 className="h-3 w-3"/></button>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  </div>
-                  <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-                    <h4 className="text-base font-bold text-gray-800 mb-3 flex items-center gap-2"><SendHorizontal className="h-4 w-4 text-icrcs-navy"/>Final Decision</h4>
-                    <div className="grid grid-cols-2 gap-2 mb-3">
-                      <button onClick={()=>setDecision('approve')} className={`p-3 rounded-xl border-2 text-center transition-all ${decision==='approve'?'border-green-500 bg-green-50':'border-gray-100 hover:border-green-300'}`}><CheckCircle className="h-5 w-5 mx-auto mb-1.5 text-green-600"/><span className="text-xs font-semibold text-gray-800">Approve</span></button>
-                      <button onClick={()=>setDecision('escalate')} className={`p-3 rounded-xl border-2 text-center transition-all ${decision==='escalate'?'border-purple-500 bg-purple-50':'border-gray-100 hover:border-purple-300'}`}><Building2 className="h-5 w-5 mx-auto mb-1.5 text-purple-600"/><span className="text-xs font-semibold text-gray-800">Escalate</span></button>
-                    </div>
-                    {decision==='approve'&&(
-                      <div className="mt-3">
-                        <label className="text-sm font-medium text-gray-600">Final Immigration Status <span className="text-red-500">*</span></label>
-                        <div className="relative mt-1">
-                          <select value={finalStatus} onChange={e=>setFinalStatus(e.target.value)} className="w-full appearance-none pl-3 pr-8 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-icrcs-navy/20 focus:border-icrcs-navy cursor-pointer transition-all">
-                            <option value="">Select final status...</option>
-                            {finalStatuses.map(s=><option key={s.value} value={s.value}>{s.label}</option>)}
-                          </select>
-                          <ChevronDown className="h-3.5 w-3.5 text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"/>
-                        </div>
-                      </div>
-                    )}
-                    {decision==='escalate'&&(
-                      <div className="mt-3">
-                        <label className="text-sm font-medium text-gray-600">Department <span className="text-red-500">*</span></label>
-                        <div className="relative mt-1">
-                          <select value={escalationDept} onChange={e=>setEscalationDept(e.target.value)} className="w-full appearance-none pl-3 pr-8 py-2 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-icrcs-navy/20 focus:border-icrcs-navy cursor-pointer transition-all">
-                            <option value="">Select department...</option>
-                            {departmentOptions.map(d=><option key={d} value={d}>{d}</option>)}
-                          </select>
-                          <ChevronDown className="h-3.5 w-3.5 text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"/>
-                        </div>
-                      </div>
-                    )}
-                    {(decision==='reject'||decision==='return'||decision==='escalate')&&<div className="mt-3"><label className="text-sm font-medium text-gray-600">Reason <span className="text-red-500">*</span></label><textarea rows={3} value={reason} onChange={e=>setReason(e.target.value)} placeholder={`Enter reason for ${decision==='reject'?'rejection':decision==='return'?'return':'escalation'}...`} className="w-full mt-1 px-3 py-2 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-icrcs-navy/20 focus:border-icrcs-navy resize-none transition-all"/></div>}
                   </div>
                 </div>
-              )}
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                  <h4 className="text-base font-bold text-gray-800 mb-3 flex items-center gap-2"><SendHorizontal className="h-4 w-4 text-icrcs-navy"/>Final Decision</h4>
+                  <div className="grid grid-cols-2 gap-2 mb-3">
+                    <button onClick={()=>setDecision('approve')} className={`p-3 rounded-xl border-2 text-center transition-all ${decision==='approve'?'border-green-500 bg-green-50':'border-gray-100 hover:border-green-300'}`}><CheckCircle className="h-5 w-5 mx-auto mb-1.5 text-green-600"/><span className="text-xs font-semibold text-gray-800">Approve</span></button>
+                    <button onClick={()=>setDecision('reject')} className={`p-3 rounded-xl border-2 text-center transition-all ${decision==='reject'?'border-red-500 bg-red-50':'border-gray-100 hover:border-red-300'}`}><XCircle className="h-5 w-5 mx-auto mb-1.5 text-red-600"/><span className="text-xs font-semibold text-gray-800">Reject</span></button>
+                    <button onClick={()=>setDecision('return')} className={`p-3 rounded-xl border-2 text-center transition-all ${decision==='return'?'border-amber-500 bg-amber-50':'border-gray-100 hover:border-amber-300'}`}><RotateCcw className="h-5 w-5 mx-auto mb-1.5 text-amber-600"/><span className="text-xs font-semibold text-gray-800">Return</span></button>
+                    <button onClick={()=>setDecision('escalate')} className={`p-3 rounded-xl border-2 text-center transition-all ${decision==='escalate'?'border-purple-500 bg-purple-50':'border-gray-100 hover:border-purple-300'}`}><Building2 className="h-5 w-5 mx-auto mb-1.5 text-purple-600"/><span className="text-xs font-semibold text-gray-800">Escalate</span></button>
+                  </div>
+                  {decision==='approve'&&(
+                    <div className="mt-3">
+                      <label className="text-sm font-medium text-gray-600">Final Immigration Status <span className="text-red-500">*</span></label>
+                      <div className="relative mt-1">
+                        <select value={finalStatus} onChange={e=>setFinalStatus(e.target.value)} className="w-full appearance-none pl-3 pr-8 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-icrcs-navy/20 focus:border-icrcs-navy cursor-pointer transition-all">
+                          <option value="">Select final status...</option>
+                          {finalStatuses.map(s=><option key={s} value={s}>{s}</option>)}
+                        </select>
+                        <ChevronDown className="h-3.5 w-3.5 text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"/>
+                      </div>
+                    </div>
+                  )}
+                  {decision==='escalate'&&(
+                    <div className="mt-3">
+                      <label className="text-sm font-medium text-gray-600">Department <span className="text-red-500">*</span></label>
+                      <div className="relative mt-1">
+                        <select value={escalationDept} onChange={e=>setEscalationDept(e.target.value)} className="w-full appearance-none pl-3 pr-8 py-2 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-icrcs-navy/20 focus:border-icrcs-navy cursor-pointer transition-all">
+                          <option value="">Select department...</option>
+                          {departmentOptions.map(d=><option key={d} value={d}>{d}</option>)}
+                        </select>
+                        <ChevronDown className="h-3.5 w-3.5 text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"/>
+                      </div>
+                    </div>
+                  )}
+                  {(decision==='reject'||decision==='return'||decision==='escalate')&&<div className="mt-3"><label className="text-sm font-medium text-gray-600">Reason <span className="text-red-500">*</span></label><textarea rows={3} value={reason} onChange={e=>setReason(e.target.value)} placeholder={`Enter reason for ${decision==='reject'?'rejection':decision==='return'?'return':'escalation'}...`} className="w-full mt-1 px-3 py-2 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-icrcs-navy/20 focus:border-icrcs-navy resize-none transition-all"/></div>}
+                </div>
+              </div>
             </div>
           )}
         </div>
