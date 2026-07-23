@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { getEnrollmentQueue, getCaseBySubject, enrollCase } from '../../../services/managementService';
+import { countryName } from '../../../utils/countries';
 import { Search, Globe, AlertCircle, Loader2, Eye, Camera, CheckCircle, X, XCircle, Fingerprint, ChevronDown, Filter, FileCheck, SendHorizontal, StickyNote, Upload, Pen, RefreshCw, AlertTriangle, Sun, Image, User, FolderOpen, ClipboardList, MessageSquare, ArrowLeft, Download, FileText, Clock, ArrowUpDown } from 'lucide-react';
 import ApplicantReviewLoader from '../../../components/common/ApplicantReviewLoader';
 import { useAuth } from '../../../app/providers/AuthProvider';
@@ -80,7 +81,7 @@ export default function Biometric() {
         caseNo: c.caseNo,
         appNo: c.subjectId,
         fullName: c.fullName,
-        nationality: c.nationalityCode,
+        nationality: countryName(c.nationalityCode),
         status: 'Pending Biometric Capture',
         officer: c.assignedOfficerName || '',
         dateReceived: c.assignedDate || c.createdAt,
@@ -190,7 +191,7 @@ export default function Biometric() {
           fullName: c.person?.fullName || existingRow.fullName || c.subjectId,
           sex: sexId === 1 ? 'Male' : sexId === 2 ? 'Female' : 'N/A',
           dob: c.person?.dateOfBirth || 'N/A',
-          nationality: c.person?.nationalityCode || existingRow.nationality,
+          nationality: countryName(c.person?.nationalityCode) || existingRow.nationality,
           caseNo: c.caseNo || existingRow.caseNo,
           appNo: c.subjectId,
           photoUrl,
@@ -203,7 +204,7 @@ export default function Biometric() {
         caseNo: c.caseNo,
         appType: c.registrationType,
         fullName: c.person?.fullName || c.subjectId,
-        nationality: c.person?.nationalityCode,
+        nationality: countryName(c.person?.nationalityCode),
         dob: c.person?.dateOfBirth,
         currentStatus: c.status,
       });

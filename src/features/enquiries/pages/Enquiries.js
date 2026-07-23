@@ -4,6 +4,7 @@ import {
   Mail, Phone, MapPin, ChevronRight, MessageSquare, X, FileText, ClipboardCheck, Check, Minus
 } from 'lucide-react';
 import { getCaseBySubject } from '../../../services/managementService';
+import { countryName } from '../../../utils/countries';
 
 export default function Enquiries() {
   const [searchType, setSearchType] = useState('subject_id');
@@ -39,7 +40,7 @@ export default function Enquiries() {
           subjectId: c.subjectId,
           name: c.person?.fullName || c.subjectId,
           dob: c.person?.dateOfBirth,
-          nationality: c.person?.nationalityCode,
+          nationality: countryName(c.person?.nationalityCode),
           gender: c.person?.sexId === 1 ? 'Male' : 'Female',
           status: c.status,
           finalStatus: c.finalStatus,

@@ -2,6 +2,7 @@ import React,{useState,useEffect,useCallback}from'react';
 import{ClipboardCheck,CheckCircle,XCircle,AlertTriangle,RotateCcw,Search,ChevronDown,ArrowUpDown,FolderOpen,Eye,X}from'lucide-react';
 import ApproveDecisionWorkspace from'../components/ApproveDecisionWorkspace';
 import{getApprovalQueue,decideCase}from'../../../services/managementService';
+import { countryName } from '../../../utils/countries';
 
 const isTerminal=s=>['approved','rejected','escalated to department','escalated'].includes(s?.toLowerCase());
 const statusBadge=s=>{const m={'Pending Approval':'bg-sky-50 text-sky-700 border-sky-200','Approved':'bg-green-50 text-green-700 border-green-200','Rejected':'bg-red-50 text-red-700 border-red-200','Returned to Assessment':'bg-amber-50 text-amber-700 border-amber-200','Escalated to Department':'bg-purple-50 text-purple-700 border-purple-200'};return m[s]||'bg-gray-50 text-gray-600 border-gray-200'};
@@ -31,7 +32,7 @@ const loadQueue=useCallback(async()=>{
       caseNo:c.caseNo,
       appNo:c.subjectId,
       fullName:c.fullName,
-      nationality:c.nationalityCode,
+      nationality:countryName(c.nationalityCode),
       gender:c.sexId===1?'Male':'Female',
       dob:c.dateOfBirth,
       status:c.status,

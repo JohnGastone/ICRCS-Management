@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { User, Home, Users, GraduationCap, Phone, HeartHandshake, Copy } from 'lucide-react';
+import { countryName } from '../../utils/countries';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 // Bare yes/no answers carry no information on a review screen — only the data
@@ -63,7 +64,7 @@ function personRows(x) {
       <InfoRow label="Relationship" value={x.relationshipType || x.parentType} />
       <InfoRow label="Gender" value={x.sex || x.gender} />
       <InfoRow label="Date of Birth" value={x.dateOfBirth} />
-      <InfoRow label="Nationality" value={x.nationality} />
+      <InfoRow label="Nationality" value={countryName(x.nationality)} />
       <InfoRow label="Occupation" value={x.occupationType} />
       <InfoRow label="Phone" value={x.phoneNumber} />
       <InfoRow label="Street" value={loc.street} />
@@ -72,7 +73,7 @@ function personRows(x) {
       <InfoRow label="Region" value={loc.region} />
       <InfoRow label="Territory" value={loc.territory} />
       <InfoRow label="City" value={x.residenceCity} />
-      <InfoRow label="Country" value={x.residenceCountry || x.country || loc.country} />
+      <InfoRow label="Country" value={countryName(x.residenceCountry || x.country || loc.country)} />
     </>
   );
 }
@@ -107,13 +108,13 @@ export default function ApplicantInfoView({ data }) {
         <InfoRow label="Gender" value={p.sex} />
         <InfoRow label="Date of Birth" value={p.dateOfBirth || birth.dateOfBirth} />
         <InfoRow label="Marital Status" value={p.maritalStatus} />
-        <InfoRow label="Nationality" value={p.nationality} />
+        <InfoRow label="Nationality" value={countryName(p.nationality)} />
         <InfoRow label="Phone Number" value={current?.phoneNumber} />
         <InfoRow label="Email Address" value={current?.email} />
       </SubSection>
 
       <SubSection title="Place of Birth">
-        <InfoRow label="Country of Birth" value={p.countryOfBirth || birth.countryOfBirth} />
+        <InfoRow label="Country of Birth" value={countryName(p.countryOfBirth || birth.countryOfBirth)} />
         <InfoRow label="Region" value={place.region} />
         <InfoRow label="District" value={place.district} />
         <InfoRow label="Ward" value={place.ward} />
@@ -144,7 +145,7 @@ export default function ApplicantInfoView({ data }) {
       <SubSection title="Travel Document">
         <InfoRow label="Document Type" value={travel.documentType} />
         <InfoRow label="Document No." value={travel.documentNo} mono />
-        <InfoRow label="Issue Country" value={travel.issueCountry} />
+        <InfoRow label="Issue Country" value={countryName(travel.issueCountry)} />
         <InfoRow label="Issue Authority" value={travel.issueAuthority} />
         <InfoRow label="Issued Date" value={travel.issuedDate} />
         <InfoRow label="Expiry Date" value={travel.expiryDate} />
@@ -153,7 +154,7 @@ export default function ApplicantInfoView({ data }) {
       <SubSection title="Entry Information">
         <InfoRow label="First Date of Entry" value={travel.firstDateOfEntry} />
         <InfoRow label="Point of Entry" value={travel.pointOfEntry} />
-        <InfoRow label="Transit Country" value={travel.transitCountry} />
+        <InfoRow label="Transit Country" value={countryName(travel.transitCountry)} />
       </SubSection>
     </div>
   );
@@ -162,7 +163,7 @@ export default function ApplicantInfoView({ data }) {
     const loc = a?.location || {};
     return (
       <SubSection title={title}>
-        <InfoRow label="Country" value={a?.country || loc.country} />
+        <InfoRow label="Country" value={countryName(a?.country || loc.country)} />
         <InfoRow label="Region" value={loc.region} />
         <InfoRow label="District" value={loc.district} />
         <InfoRow label="Ward" value={loc.ward} />
@@ -195,7 +196,7 @@ export default function ApplicantInfoView({ data }) {
           <InfoRow label="School / Institution" value={e.schoolName} />
           <InfoRow label="Completion Year" value={e.completionYear && String(e.completionYear)} />
           <InfoRow label="City" value={e.city} />
-          <InfoRow label="Country" value={e.country} />
+          <InfoRow label="Country" value={countryName(e.country)} />
           <InfoRow label="Index / Reg. No." value={e.registrationNumber} mono />
         </SubSection>
       ))}
