@@ -28,6 +28,11 @@ export const API_ENDPOINTS = {
     ASSESS:          (caseNo)    => `/management/cases/${encodeURIComponent(caseNo)}/assess`,
     DECIDE:          (caseNo)    => `/management/cases/${encodeURIComponent(caseNo)}/decide`,
     APPLICANT:       (caseNo)    => `/management/cases/${encodeURIComponent(caseNo)}/applicant`,
+    ASSESSMENT_HISTORY: (caseNo) => `/management/cases/${encodeURIComponent(caseNo)}/assessment-history`,
+    ESCALATED:       '/management/cases/escalated',
+    ADJUDICATION:    '/management/cases/adjudication',
+    ADJUDICATION_DETAIL: (id) => `/management/cases/adjudication/${encodeURIComponent(id)}`,
+    ADJUDICATION_RESOLVE: (id) => `/management/cases/adjudication/${encodeURIComponent(id)}/resolve`,
   },
 };
 

@@ -120,7 +120,7 @@ export async function cancelCapture(jobId) {
  * @param {number} [intervalMs]
  * @returns {Promise<CaptureJob>} the terminal job
  */
-export async function pollUntilTerminal(jobId, onTick, intervalMs = 300) {
+export async function pollUntilTerminal(jobId, onTick, intervalMs = 150) {
   for (;;) {
     const job = await getCaptureJob(jobId);
     if (onTick) onTick(job);
@@ -131,26 +131,72 @@ export async function pollUntilTerminal(jobId, onTick, intervalMs = 300) {
 
 /**
  * Open the live-preview WebSocket for an in-progress capture job. The agent
- * relays RSWAS's own CanvasInfo feed (base64 PNG) roughly every 200ms while
- * the job is IN_PROGRESS, then sends one final frameless status message and
- * closes the socket itself once the job reaches a terminal state - this
- * function does not need to poll or close proactively, only listen.
+ * relays RSWAS's own CanvasInfo feed (base64 PNG, ~30ms cadence - matching
+ * RSWAS's own reference sample) while the job is IN_PROGRESS, plus RSWAS's
+ * own real-time guidance text (its msg/cmsg fields, e.g. what to do next),
+ * then sends one final frameless status message and closes the socket itself
+ * once the job reaches a terminal state - this function does not need to
+ * poll or close proactively, only listen.
  * @param {string} jobId
  * @param {(frame: string) => void} onFrame   called with a base64 PNG each time a live frame arrives
+ * @param {(status: JobStatus) => void} [onStatus]  called with every status the socket reports, frame or not
+ * @param {(text: string) => void} [onMessage]  called with RSWAS's own live guidance text, when present
+ * @param {(count: number) => void} [onDetectedCount]  called with how many fingers RSWAS currently sees well enough to score
  * @returns {() => void} call to close the socket early (e.g. on unmount/cancel)
  */
-export function openPreviewStream(jobId, onFrame) {
+export function openPreviewStream(jobId, onFrame, onStatus, onMessage, onDetectedCount) {
   const wsUrl = `${DEVICE_SERVICE_URL.replace(/^http/, 'ws')}/ws/fingerprint/${jobId}`;
   const socket = new WebSocket(wsUrl);
+  const openedAt = Date.now();
   socket.onmessage = (event) => {
     try {
       const message = JSON.parse(event.data);
+      // Diagnostic: RSWAS's own timing of detectedFingerCount/message/status
+      // relative to each other is what determines whether an early "buzzer"
+      // signal is even observable before the blocking /Capture call returns.
+      // Check DevTools console during a real capture to see whether
+      // detectedFingerCount actually climbs before status flips to COMPLETED.
+      // eslint-disable-next-line no-console
+      console.debug(`[fp ${jobId}] +${Date.now() - openedAt}ms status=${message.status} detectedFingerCount=${message.detectedFingerCount} message=${JSON.stringify(message.message || '')} frame=${message.frame ? 'yes' : 'no'}`);
       if (message.frame) onFrame(message.frame);
+      if (onStatus && message.status) onStatus(message.status);
+      if (onMessage && message.message) onMessage(message.message);
+      if (onDetectedCount && typeof message.detectedFingerCount === 'number') onDetectedCount(message.detectedFingerCount);
     } catch {
       // ignore malformed frames - the next one will self-correct
     }
   };
   return () => socket.close();
+}
+
+/**
+ * Start receiving live frames for a job AND resolve as soon as it finishes -
+ * whichever arrives first, the WebSocket's own status push (near-instant,
+ * since it's the same signal that ends the live-preview feed) or the HTTP
+ * poll (a safety net in case the socket drops). This is what removes the lag
+ * between the live view visibly finishing and the app rendering the result:
+ * without it, the app only found out via pollUntilTerminal's next tick.
+ * @param {string} jobId
+ * @param {(frame: string) => void} onFrame
+ * @param {(text: string) => void} [onMessage]  RSWAS's own live guidance text, when present
+ * @param {(count: number) => void} [onDetectedCount]  how many fingers RSWAS currently sees well enough to score
+ * @param {number} [pollIntervalMs]
+ * @returns {{ result: Promise<CaptureJob>, close: () => void }}
+ */
+export function awaitCapture(jobId, onFrame, onMessage, onDetectedCount, pollIntervalMs = 150) {
+  let settled = false;
+  let fastResolve;
+  const fast = new Promise((resolve) => { fastResolve = resolve; });
+  const close = openPreviewStream(jobId, onFrame, (status) => {
+    if (settled || !TERMINAL_STATUSES.has(status)) return;
+    settled = true;
+    fastResolve(getCaptureJob(jobId));
+  }, onMessage, onDetectedCount);
+  const polled = pollUntilTerminal(jobId, null, pollIntervalMs).then((job) => {
+    settled = true;
+    return job;
+  });
+  return { result: Promise.race([fast, polled]), close };
 }
 
 // --- Mapping between the device's enum and this page's {hand, name} finger model ---
@@ -190,3 +236,67 @@ export const GROUP_KEY_TO_DEVICE = {
   right: 'RIGHT_HAND',
   thumbs: 'THUMBS',
 };
+
+// --- Camera (Canon EDSDK bridge) and Signature pad (Wacom STU-430 bridge) ---
+//
+// Unlike fingerprint capture, neither of these is an async job: a DSLR
+// shutter press is fast, and a signature is just read back from whatever the
+// live view already shows - see icrcs-device-service's camera/signature
+// modules. Both follow the same shape: GET .../status, WS /ws/<device> for a
+// continuously-running live view (open the socket to start it, close to stop),
+// and POST .../capture to take the shot/read back the current drawing.
+
+/** @returns {Promise<{connected: boolean, message: string}>} */
+export function getCameraStatus() {
+  return fetch(`${DEVICE_SERVICE_URL}/api/v1/camera/status`).then((res) => asJson(res, 'Camera status check'));
+}
+
+/** @returns {Promise<{connected: boolean, message: string}>} */
+export function getSignaturePadStatus() {
+  return fetch(`${DEVICE_SERVICE_URL}/api/v1/signature/status`).then((res) => asJson(res, 'Signature pad status check'));
+}
+
+/** Takes a photo now. @returns {Promise<string>} base64 PNG/JPEG */
+export async function captureCameraPhoto() {
+  const response = await fetch(`${DEVICE_SERVICE_URL}/api/v1/camera/capture`, { method: 'POST' });
+  const body = await asJson(response, 'Camera capture');
+  return body.image;
+}
+
+/** Reads back whatever is currently signed on the pad. @returns {Promise<string>} base64 PNG */
+export async function captureSignature() {
+  const response = await fetch(`${DEVICE_SERVICE_URL}/api/v1/signature/capture`, { method: 'POST' });
+  const body = await asJson(response, 'Signature capture');
+  return body.image;
+}
+
+/** Clears whatever is currently drawn on the physical pad. */
+export async function clearSignaturePad() {
+  const response = await fetch(`${DEVICE_SERVICE_URL}/api/v1/signature/clear`, { method: 'POST' });
+  if (!response.ok) {
+    throw new Error(`Signature pad clear failed (${response.status})`);
+  }
+}
+
+/**
+ * Opens a live-view WebSocket for the camera or signature pad. The socket's
+ * own open/close lifecycle starts and stops the device's live view - close()
+ * MUST be called (e.g. on unmount, or when leaving the capture step) or the
+ * bridge is left streaming indefinitely.
+ * @param {'camera'|'signature'} device
+ * @param {(frame: string) => void} onFrame  called with a base64 frame each time one arrives
+ * @returns {() => void} call to close the socket
+ */
+export function openLiveView(device, onFrame) {
+  const wsUrl = `${DEVICE_SERVICE_URL.replace(/^http/, 'ws')}/ws/${device}`;
+  const socket = new WebSocket(wsUrl);
+  socket.onmessage = (event) => {
+    try {
+      const message = JSON.parse(event.data);
+      if (message.frame) onFrame(message.frame);
+    } catch {
+      // ignore malformed frames - the next one will self-correct
+    }
+  };
+  return () => socket.close();
+}

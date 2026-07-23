@@ -1,16 +1,21 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getEnrollmentQueue, getCaseBySubject, enrollCase } from '../../../services/managementService';
-import { Search, Globe, AlertCircle, Loader2, Eye, Camera, CheckCircle, X, XCircle, Fingerprint, ChevronDown, Filter, FileCheck, SendHorizontal, StickyNote, Upload, Pen, RefreshCw, AlertTriangle, Sun, Image, User, FolderOpen, ClipboardList, MessageSquare, ArrowLeft, Download, FileText, Clock, ArrowUpDown } from 'lucide-react';
+import { getEnrollmentQueue, getCaseBySubject, getApplicantReview, enrollCase } from '../../../services/managementService';
+import { Search, Globe, AlertCircle, Loader2, Eye, Camera, CheckCircle, X, XCircle, Fingerprint, ChevronDown, Filter, FileCheck, SendHorizontal, StickyNote, Upload, Pen, RefreshCw, AlertTriangle, Sun, Image, User, FolderOpen, ClipboardList, ArrowLeft, Download, FileText, ArrowUpDown } from 'lucide-react';
 import ApplicantInfoView from '../../../components/common/ApplicantInfoView';
 import { buildApplicant } from '../../../data/mockApplicantData';
 import {
   startCapture,
   startGroupCapture,
-  pollUntilTerminal,
-  openPreviewStream,
+  awaitCapture,
   POSITION_TO_FINGER,
   FINGER_TO_POSITION,
   GROUP_KEY_TO_DEVICE,
+  getCameraStatus,
+  captureCameraPhoto,
+  getSignaturePadStatus,
+  captureSignature,
+  clearSignaturePad,
+  openLiveView,
 } from '../../../services/deviceService';
 
 // Maximum scanner qualityScore to accept a finger. Confirmed on real RealScan-G10
@@ -18,6 +23,11 @@ import {
 // NOT a 0-100 score where higher is better. 3 is the "Acceptable" ceiling used by
 // getQualityLabel below - NFIQ 1-3 accepted, 4-5 rejected.
 const MAX_ACCEPTABLE_NFIQ = 3;
+
+// RSWAS's live guidance text (msg/cmsg) that indicates a bad placement. Kept
+// narrow and in one place - a bare "-" or "finger is on" was too broad and
+// could misclassify ordinary guidance text as a failure.
+const FAILURE_GUIDANCE_RE = /cannot|dirty|error|failed|fault/i;
 
 // Fingers that make up each physical placement group on the RealScan-G10. Shared
 // by capture and group-recapture so both operate on exactly the same set.
@@ -30,39 +40,24 @@ const GROUP_LABELS = { left: 'Left Hand', thumbs: 'Thumbs', right: 'Right Hand' 
 
 const mockPortalApps = {
   'APP-2026-000145': {
-    appNo: 'APP-2026-000145', appType: 'Status Determination', submissionDate: '12-Jun-2026', currentStatus: 'Submitted',
+    appNo: 'APP-2026-000145', appType: 'Status Determination', submissionDate: '12-Jun-2026', currentStatus: 'PENDING_ENROLLMENT',
     fullName: 'John Michael Doe', gender: 'Male', dob: '10-Jan-1990', nationality: 'Kenyan',
     passportNo: 'A12345678', countryOfIssue: 'Kenya', entryPoint: 'Namanga', dateOfEntry: '01-Jun-2026',
     attachments: ['Passport Copy', 'Birth Certificate', 'Supporting Letter']
   },
   'APP-2026-000146': {
-    appNo: 'APP-2026-000146', appType: 'Resident Permit', submissionDate: '11-Jun-2026', currentStatus: 'Submitted',
+    appNo: 'APP-2026-000146', appType: 'Resident Permit', submissionDate: '11-Jun-2026', currentStatus: 'PENDING_ENROLLMENT',
     fullName: 'Sarah Jane Kimani', gender: 'Female', dob: '05-Mar-1985', nationality: 'Ugandan',
     passportNo: 'B87654321', countryOfIssue: 'Uganda', entryPoint: 'Mutukula', dateOfEntry: '28-May-2026',
     attachments: ['Passport Copy', 'Residency Proof']
   },
+  'APP-2026-000147': {
+    appNo: 'APP-2026-000147', appType: 'Status Determination', submissionDate: '10-Jun-2026', currentStatus: 'PENDING_ENROLLMENT',
+    fullName: 'Robert Kimaro', gender: 'Male', dob: '1992-07-22', nationality: 'Kenyan',
+    passportNo: 'KEN-1992-0722-001', countryOfIssue: 'Kenya', entryPoint: 'Namanga', dateOfEntry: '01-Jun-2026',
+    attachments: ['Passport Copy']
+  }
 };
-
-const initialQueue = [
-  { caseNo: 'ICRCS-BIO-2026-000245', appNo: 'APP-2026-000143', fullName: 'Amina Hassan', nationality: 'Tanzanian', status: 'Pending Biometric Capture', officer: 'Grace Temu', dateReceived: '10-Jun-2026' },
-  { caseNo: 'ICRCS-BIO-2026-000244', appNo: 'APP-2026-000144', fullName: 'Robert Kimaro', nationality: 'Kenyan', status: 'Biometric In Progress', officer: 'James Otieno', dateReceived: '09-Jun-2026' },
-  { caseNo: 'ICRCS-BIO-2026-000243', appNo: 'APP-2026-000142', fullName: 'Halima Said', nationality: 'Rwandan', status: 'Biometric Enrollment Completed', officer: 'Grace Temu', dateReceived: '08-Jun-2026' },
-  { caseNo: 'ICRCS-BIO-2026-000242', appNo: 'APP-2026-000141', fullName: 'Michael Bwire', nationality: 'Ugandan', status: 'Forwarded to Assessment', officer: 'James Otieno', dateReceived: '07-Jun-2026' },
-  { caseNo: 'ICRCS-BIO-2026-000241', appNo: 'APP-2026-000140', fullName: 'Fatma Juma', nationality: 'Burundian', status: 'Pending Biometric Capture', officer: 'Juma Kipanya', dateReceived: '06-Jun-2026' },
-  { caseNo: 'ICRCS-BIO-2026-000240', appNo: 'APP-2026-000139', fullName: 'Peter Ochieng', nationality: 'Kenyan', status: 'Pending Biometric Capture', officer: 'Grace Temu', dateReceived: '05-Jun-2026' },
-  { caseNo: 'ICRCS-BIO-2026-000239', appNo: 'APP-2026-000138', fullName: 'Joyce Mwende', nationality: 'Tanzanian', status: 'Biometric In Progress', officer: 'James Otieno', dateReceived: '04-Jun-2026' },
-  { caseNo: 'ICRCS-BIO-2026-000238', appNo: 'APP-2026-000137', fullName: 'Daniel Ndayisaba', nationality: 'Burundian', status: 'Biometric Enrollment Completed', officer: 'Juma Kipanya', dateReceived: '03-Jun-2026' },
-  { caseNo: 'ICRCS-BIO-2026-000237', appNo: 'APP-2026-000136', fullName: 'Grace Akello', nationality: 'Ugandan', status: 'Forwarded to Assessment', officer: 'Grace Temu', dateReceived: '02-Jun-2026' },
-  { caseNo: 'ICRCS-BIO-2026-000236', appNo: 'APP-2026-000135', fullName: 'Samuel Kagame', nationality: 'Rwandan', status: 'Pending Biometric Capture', officer: 'James Otieno', dateReceived: '01-Jun-2026' },
-  { caseNo: 'ICRCS-BIO-2026-000235', appNo: 'APP-2026-000134', fullName: 'Esther Wanjiku', nationality: 'Kenyan', status: 'Biometric In Progress', officer: 'Juma Kipanya', dateReceived: '31-May-2026' },
-  { caseNo: 'ICRCS-BIO-2026-000234', appNo: 'APP-2026-000133', fullName: 'Charles Mugisha', nationality: 'Ugandan', status: 'Biometric Enrollment Completed', officer: 'Grace Temu', dateReceived: '30-May-2026' },
-];
-
-const viewNotesHistory = [
-  {id:1,ts:'12-Jun-2026 10:15 AM',officer:'J. Smith',text:'Initial assessment started. Documents reviewed and applicant identity verified.',recommendation:null},
-  {id:2,ts:'12-Jun-2026 11:05 AM',officer:'J. Smith',text:'Biometric verification confirmed successful. Applicant meets initial eligibility criteria.',recommendation:null},
-  {id:3,ts:'12-Jun-2026 12:30 PM',officer:'A. Mwenda',text:'Recommendation updated: Further verification required due to minor document discrepancy on entry records.',recommendation:'escalate'},
-];
 
 let nextCaseSeq = 246;
 
@@ -74,24 +69,125 @@ const statusBadge = (s) => {
   return 'bg-amber-50 text-amber-700 border-amber-100';
 };
 
-const buildDetails = (row) => ({
-  caseNo: row.caseNo,
-  appNo: row.appNo,
-  appType: 'Status Determination',
-  submissionDate: row.dateReceived,
-  currentStatus: row.status,
-  fullName: row.fullName,
-  gender: 'Not specified',
-  dob: 'Not specified',
-  nationality: row.nationality,
-  passportNo: 'Not on record',
-  countryOfIssue: 'Not on record',
-  entryPoint: 'Not on record',
-  dateOfEntry: 'Not on record',
-  attachments: ['Passport Copy', 'Birth Certificate', 'Supporting Documents'],
-  officer: row.officer,
-  dateReceived: row.dateReceived,
-});
+function joinName(...parts) { return parts.filter(Boolean).join(' '); }
+function joinPlace(...parts) { return parts.filter(Boolean).join(', ') || '—'; }
+
+function mimeToExt(mimeType) {
+  if (!mimeType) return 'doc';
+  if (mimeType === 'application/pdf') return 'pdf';
+  if (mimeType === 'image/jpeg' || mimeType === 'image/jpg') return 'jpg';
+  if (mimeType === 'image/png') return 'png';
+  return mimeType.split('/')[1] || 'doc';
+}
+
+function attachmentsFromReview(review) {
+  return (review?.attachments || []).map((att, i) => {
+    const attObj = typeof att === 'string' ? { attachmentType: att, mimeType: 'application/pdf', fileUrl: '' } : att;
+    const ext = mimeToExt(attObj.mimeType);
+    const isImage = attObj.mimeType?.startsWith('image/');
+    return { id: i + 1, attachmentType: attObj.attachmentType || 'Document', name: (attObj.attachmentType || 'Document') + '.' + ext, url: attObj.fileUrl, mimeType: attObj.mimeType || 'application/pdf', isImage, ext };
+  });
+}
+
+function mapReviewToApplicant(r) {
+  if (!r) return {};
+  if (r.fullName && !r.personalDetails) return r; // Already mapped mock data
+  const p = r.personalDetails || {};
+  const birth = r.birthDetails || {};
+  const addrs = r.addresses || [];
+  const cur = addrs.find(a => a.addressType === 'CURRENT') || addrs[0];
+  const perm = addrs.find(a => a.addressType === 'PERMANENT');
+  const father = (r.parents || []).find(x => x.parentType === 'FATHER');
+  const mother = (r.parents || []).find(x => x.parentType === 'MOTHER');
+  const emp = r.employment;
+  const mapParent = x => {
+    if (!x) return null;
+    let country = x.residenceLocation?.country || x.residenceCountry || '';
+    let region = x.residenceLocation?.region || '';
+    let district = x.residenceLocation?.district || '';
+    let ward = x.residenceLocation?.ward || '';
+    let street = x.residenceLocation?.street || '';
+    if (!region && !district && typeof x.residence === 'string' && x.residence.includes(',')) {
+      const parts = x.residence.split(',').map(s => s.trim());
+      if (parts.length > 0) country = parts[parts.length - 1];
+      if (parts.length > 1) region = parts[parts.length - 2];
+      if (parts.length > 2) district = parts[parts.length - 3];
+      if (parts.length > 3) ward = parts[parts.length - 4];
+      if (parts.length > 4) street = parts.slice(0, parts.length - 4).join(', ');
+    } else if (!region && !district && typeof x.residence === 'string') {
+      street = x.residence;
+    }
+    return {
+      fullName: joinName(x.firstName, x.middleName, x.lastName) || x.fullName,
+      dob: x.dateOfBirth || x.dob,
+      phone: x.phoneNumber || x.phone || '—',
+      nationality: x.nationality,
+      residenceCountry: country,
+      residenceRegion: region,
+      residenceDistrict: district,
+      residenceWard: ward,
+      residenceStreet: street,
+      residence: typeof x.residence === 'string' ? x.residence : joinPlace(district, x.residenceCity || region, country),
+    };
+  };
+  const mapKin = x => ({
+    fullName: joinName(x.firstName, x.middleName, x.lastName),
+    gender: x.sex, dob: x.dateOfBirth,
+    relationship: x.relationshipType,
+    phone: x.phoneNumber || '—',
+    nationality: x.nationality,
+    residence: joinPlace(x.residenceLocation?.district, x.residenceCity, x.residenceCountry),
+  });
+  const mapAddr = a => a ? {
+    country: a.country || a.location?.country,
+    city: a.city,
+    region: a.location?.region,
+    district: a.location?.district,
+    ward: a.location?.ward,
+    houseStreet: a.houseNo,
+    postalCode: a.postalAddress,
+  } : null;
+  return {
+    fullName: joinName(p.firstName, p.middleName, p.lastName),
+    gender: p.sex, dob: p.dateOfBirth,
+    citizenshipType: r.citizenshipType,
+    nationality: p.nationality,
+    countryOfBirth: p.countryOfBirth || birth.countryOfBirth,
+    region: cur?.location?.region,
+    district: cur?.location?.district,
+    ward: cur?.location?.ward,
+    villageStreet: cur?.location?.street,
+    birthCertificateNo: birth.birthCertificateNo || '—',
+    maritalStatus: p.maritalStatus,
+    phone: cur?.phoneNumber,
+    email: cur?.email,
+    currentAddress: mapAddr(cur),
+    permanentSameAsCurrent: !perm,
+    permanentAddress: mapAddr(perm),
+    father: mapParent(father),
+    mother: mapParent(mother),
+    spouses: (r.spouses || []).map(mapKin),
+    relatives: (r.relatives || []).map(mapKin),
+    children: (r.children || []).map(mapKin),
+    education: (r.educationList || []).map(e => ({
+      level: e.educationLevel, institution: e.schoolName,
+      completionYear: e.completionYear ? String(e.completionYear) : '—',
+      city: joinPlace(e.city, e.country), indexNo: e.registrationNumber,
+    })),
+    employment: emp ? {
+      status: emp.employmentStatus,
+      occupation: emp.occupationType || emp.otherOccupation || '—',
+      employer: emp.organizationName || '—',
+    } : null,
+    documents: (r.documents || []).map(d => ({ type: d.documentType, number: d.documentNumber })),
+    emergencyContacts: (r.emergencyContacts || []).map(c => ({
+      fullName: c.fullName, relationship: c.relationshipType,
+      occupation: c.occupationType || '—', gender: c.gender || '—',
+      phone: c.phoneNumber || '—', nationality: c.nationality || '—',
+      residence: joinPlace(c.residenceLocation?.district, c.residenceCity, c.country),
+    })),
+  };
+}
 
 export default function Biometric() {
   const [appNumber, setAppNumber] = useState('');
@@ -113,6 +209,7 @@ export default function Biometric() {
         status: 'Pending Biometric Capture',
         officer: c.assignedOfficerName || '',
         dateReceived: c.assignedDate || c.createdAt,
+        registrationType: c.registrationType,
       }));
       setQueue(items);
     } catch (e) {
@@ -128,8 +225,6 @@ export default function Biometric() {
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [activeReviewTab, setActiveReviewTab] = useState('info');
   const [previewDoc, setPreviewDoc] = useState(null);
-  const [reviewRemarks, setReviewRemarks] = useState('');
-  const [releaseRemarksError, setReleaseRemarksError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [showCaptureModal, setShowCaptureModal] = useState(false);
   const [captureTarget, setCaptureTarget] = useState(null);
@@ -138,6 +233,24 @@ export default function Biometric() {
   const [photoCaptured, setPhotoCaptured] = useState(false);
   const [photoSaved, setPhotoSaved] = useState(false);
   const [cameraStarted, setCameraStarted] = useState(false);
+  // Latest base64 frame from the camera's live-view WebSocket, shown in the
+  // preview card while the camera is on and no photo has been captured yet.
+  const [cameraLiveFrame, setCameraLiveFrame] = useState(null);
+  const closeCameraLiveViewRef = React.useRef(() => {});
+
+  // Opens the camera's live-view WebSocket for as long as the camera is on -
+  // the socket's own open/close is what starts/stops the bridge streaming
+  // (see deviceService.js's openLiveView), independent of any single capture.
+  useEffect(() => {
+    if (!cameraStarted) return undefined;
+    const close = openLiveView('camera', setCameraLiveFrame);
+    closeCameraLiveViewRef.current = close;
+    return () => {
+      close();
+      setCameraLiveFrame(null);
+    };
+  }, [cameraStarted]);
+
   const [photoQuality, setPhotoQuality] = useState({ score: 0, checks: { faceCentered: false, neutralExpression: false, goodLighting: false, eyesVisible: false, noShadows: false, noObstruction: false, plainBackground: false } });
   const [photoTimestamp, setPhotoTimestamp] = useState('');
   const [photoPreview, setPhotoPreview] = useState('');
@@ -159,6 +272,21 @@ export default function Biometric() {
   const [sigStrokes, setSigStrokes] = useState([]);
   const sigCanvasRef = React.useRef(null);
   const sigFileInputRef = React.useRef(null);
+  // Real Wacom STU-430 pad, as an alternative to drawing with a mouse/touch -
+  // same live-view-WS-drives-the-device pattern as the camera.
+  const [signaturePadActive, setSignaturePadActive] = useState(false);
+  const [signaturePadLiveFrame, setSignaturePadLiveFrame] = useState(null);
+  const closeSignaturePadLiveViewRef = React.useRef(() => {});
+
+  useEffect(() => {
+    if (!signaturePadActive) return undefined;
+    const close = openLiveView('signature', setSignaturePadLiveFrame);
+    closeSignaturePadLiveViewRef.current = close;
+    return () => {
+      close();
+      setSignaturePadLiveFrame(null);
+    };
+  }, [signaturePadActive]);
   const [fpQuality, setFpQuality] = useState({
     left: { index: 0, middle: 0, ring: 0, pinky: 0 },
     right: { index: 0, middle: 0, ring: 0, pinky: 0 },
@@ -171,12 +299,45 @@ export default function Biometric() {
   });
   const [selectedFinger, setSelectedFinger] = useState(null);
   const [scanningFinger, setScanningFinger] = useState(null);
-  // Latest base64 PNG frame from the scanner's live-preview WebSocket, shown in
-  // the viewfinder panel while scanningFinger is set. Cleared once the job ends.
+  // Latest base64 PNG frame from the scanner's live-preview WebSocket, and
+  // whether the viewfinder panel should be shown at all. Deliberately NOT
+  // tied to scanningFinger: on success we close it automatically, but on
+  // failure it stays up (frozen on the last frame) until the operator
+  // dismisses it or a retry succeeds - so a failed attempt doesn't just
+  // vanish without a chance to see what the scanner actually saw.
   const [livePreviewFrame, setLivePreviewFrame] = useState(null);
+  const [previewVisible, setPreviewVisible] = useState(false);
+  // What the (possibly now-finished) preview panel is showing - kept separate
+  // from scanningFinger so the label survives into the post-failure review state.
+  const [previewTarget, setPreviewTarget] = useState(null);
+  // RSWAS's own real-time guidance text (its msg/cmsg fields) - what it's
+  // actually doing right now, straight from the vendor SDK rather than us
+  // guessing at a generic "Scanning..." label.
+  const [liveGuidance, setLiveGuidance] = useState('');
+  // RSWAS's raw live "well-scored fingers" count, shown on-screen during a
+  // capture purely as a diagnostic readout - lets us watch, on the real
+  // device, whether this ever climbs before the job finishes without having
+  // to dig through the browser console every time.
+  const [liveDetectedCount, setLiveDetectedCount] = useState(0);
+  // True once RSWAS's live feed reports every expected finger detected with a
+  // non-zero quality - i.e. the placement looks good, well before RSWAS's slow
+  // /Capture call actually returns with real templates. Drives a "Confirming..."
+  // visual on the affected (still 'capturing') cards so the operator gets
+  // positive feedback immediately instead of staring at a spinner for 10-15s.
+  // Purely cosmetic: it never marks anything as actually captured.
+  const [previewConfirming, setPreviewConfirming] = useState(false);
   // base64 image + ISO template per captured finger, keyed [hand][name] - held in
   // a ref so it survives re-renders without triggering them; read at enrollment.
   const capturedArtifactsRef = React.useRef({ left: {}, right: {}, thumbs: {} });
+  // Identifies whichever capture operation currently "owns" the shared dialog/
+  // lock state (scanningFinger, previewVisible, etc). Each captureGroup/
+  // captureSingleFinger call stakes a fresh token here at start. A capture's
+  // slow background job (or a manual dialog dismiss) only touches that shared
+  // state if its own token still matches - i.e. nothing newer has taken over -
+  // so a stale result landing late, or the operator closing the dialog by
+  // hand, can never clobber or re-lock a different, newer operation.
+  const activeCaptureRef = React.useRef(null);
+  const sigPadSocketRef = React.useRef(null);
   const [commentModal, setCommentModal] = useState({ open: false, hand: '', name: '', label: '', comment: '' });
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(5);
@@ -189,6 +350,9 @@ export default function Biometric() {
 
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewTarget, setViewTarget] = useState(null);
+  const [viewReview, setViewReview] = useState(null);
+  const [loadingViewApplicant, setLoadingViewApplicant] = useState(false);
+  const [viewApplicantError, setViewApplicantError] = useState('');
   const [activeViewTab, setActiveViewTab] = useState('info');
   const [viewPreviewDoc, setViewPreviewDoc] = useState(null);
   const [showForwardConfirm, setShowForwardConfirm] = useState(false);
@@ -203,15 +367,54 @@ export default function Biometric() {
     setError('');
     setFetchedApp(null);
     clearSuccess();
-    if (!appNumber.trim()) { setError('Please enter the Subject ID.'); return; }
+    const query = appNumber.trim();
+    if (!query) { setError('Please enter the Subject ID.'); return; }
     setLoading(true);
+
+    // Mock fallback first check
+    const mockApp = mockPortalApps[query] || Object.values(mockPortalApps).find(a => a.appNo.toLowerCase() === query.toLowerCase());
+    if (mockApp) {
+      setTimeout(() => {
+        setLoading(false);
+        const existingRow = queue.find(q => q.appNo === mockApp.appNo);
+        if (existingRow) {
+          setQuickServeTarget({
+            queueRow: existingRow,
+            fullName: mockApp.fullName,
+            sex: mockApp.gender || 'N/A',
+            dob: mockApp.dob || 'N/A',
+            nationality: mockApp.nationality,
+            caseNo: existingRow.caseNo,
+            appNo: mockApp.appNo,
+            photoUrl: null,
+          });
+          setShowQuickServeModal(true);
+        } else {
+          setFetchedApp({
+            appNo: mockApp.appNo,
+            caseNo: `ICRCS-BIO-2026-${String(nextCaseSeq++).padStart(5, '0')}`,
+            appType: mockApp.appType,
+            fullName: mockApp.fullName,
+            nationality: mockApp.nationality,
+            dob: mockApp.dob,
+            currentStatus: 'PENDING_ENROLLMENT',
+            createdAt: new Date().toISOString(),
+            applicantData: buildApplicant(mockApp),
+          });
+          setShowReviewModal(true);
+        }
+      }, 500);
+      return;
+    }
+
     try {
-      const c = await getCaseBySubject(appNumber.trim());
+      const c = await getCaseBySubject(query);
       if (!c) { setError('No case found for that Subject ID.'); return; }
       const existingRow = queue.find(q => q.appNo === c.subjectId || q.caseNo === c.caseNo);
       if (existingRow) {
+        const review = await getApplicantReview(c.caseNo).catch(() => null);
         const sexId = c.person?.sexId;
-        const photoUrl = c.applicantData?.attachments?.find(
+        const photoUrl = review?.attachments?.find(
           a => a.attachmentType === 'Applicant Passport Size Photo'
         )?.fileUrl || null;
         setQuickServeTarget({
@@ -227,6 +430,7 @@ export default function Biometric() {
         setShowQuickServeModal(true);
         return;
       }
+      const review = await getApplicantReview(c.caseNo).catch(() => null);
       setFetchedApp({
         appNo: c.subjectId,
         caseNo: c.caseNo,
@@ -235,9 +439,9 @@ export default function Biometric() {
         nationality: c.person?.nationalityCode,
         dob: c.person?.dateOfBirth,
         currentStatus: c.status,
+        createdAt: c.createdAt,
+        applicantData: review || c.applicantData || buildApplicant({ appNo: c.subjectId, fullName: c.person?.fullName }),
       });
-      setReviewRemarks('');
-      setReleaseRemarksError('');
       setShowReviewModal(true);
     } catch (err) {
       setError(err.message || 'No case found for that Subject ID.');
@@ -246,31 +450,39 @@ export default function Biometric() {
     }
   };
 
-  const closeReviewModal = () => { setShowReviewModal(false); setFetchedApp(null); setReviewRemarks(''); setReleaseRemarksError(''); setActiveReviewTab('info'); setPreviewDoc(null); };
+  const closeReviewModal = () => { setShowReviewModal(false); setFetchedApp(null); setActiveReviewTab('info'); setPreviewDoc(null); };
   const closeQuickServeModal = () => { setShowQuickServeModal(false); setQuickServeTarget(null); };
 
-  const saveToBiometricEnrollment = () => {
+  const saveToBiometricEnrollment = async () => {
     if (!fetchedApp) return;
-    const caseNo = `ICRCS-BIO-2026-${String(nextCaseSeq++).padStart(5, '0')}`;
-    const dateReceived = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-    const newItem = {
-      caseNo, appNo: fetchedApp.appNo, fullName: fetchedApp.fullName, nationality: fetchedApp.nationality,
-      status: 'Pending Biometric Capture', officer: 'Officer', dateReceived,
-      details: { ...fetchedApp, caseNo, currentStatus: 'Pending Biometric Capture', officer: 'Officer', dateReceived }
-    };
-    setQueue(prev => [newItem, ...prev]);
+    if (fetchedApp.currentStatus !== 'PENDING_ENROLLMENT' && fetchedApp.currentStatus !== 'Submitted') {
+      setError(`This case is not eligible for biometric enrollment (current status: ${fetchedApp.currentStatus}).`);
+      return;
+    }
+    if (fetchedApp.appNo.startsWith('APP-')) {
+      const dateReceived = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+      const newItem = {
+        caseNo: fetchedApp.caseNo,
+        appNo: fetchedApp.appNo,
+        fullName: fetchedApp.fullName,
+        nationality: fetchedApp.nationality,
+        status: 'Pending Biometric Capture',
+        officer: 'Officer',
+        dateReceived,
+        details: fetchedApp,
+      };
+      setQueue(prev => [newItem, ...prev]);
+      closeReviewModal();
+      setAppNumber('');
+      setSuccessMsg('Application successfully received into Biometric Enrollment.');
+      setTimeout(clearSuccess, 5000);
+      return;
+    }
     closeReviewModal();
     setAppNumber('');
     setCurrentPage(1);
+    await loadQueue();
     setSuccessMsg('Application successfully received into Biometric Enrollment.');
-    setTimeout(clearSuccess, 5000);
-  };
-
-  const releaseApplication = () => {
-    if (!reviewRemarks.trim()) { setReleaseRemarksError('Remarks are required when releasing an application.'); return; }
-    closeReviewModal();
-    setAppNumber('');
-    setSuccessMsg('Application has been released back to the Online Application Portal.');
     setTimeout(clearSuccess, 5000);
   };
 
@@ -327,6 +539,7 @@ export default function Biometric() {
     setSignatureTimestamp('');
     setSignatureMethod('');
     setSignatureQuality({ score: 0, checks: { visible: false, complete: false, noCropping: false, goodContrast: false, noExcessMarks: false, confirmed: false } });
+    setSignaturePadActive(false);
     setShowClearConfirm(false);
     setIsDrawing(false);
     setSigStrokes([]);
@@ -345,11 +558,33 @@ export default function Biometric() {
     return `${handLabel} ${fingerName}`;
   };
   const getScanningLabel = () => {
-    if (!scanningFinger) return '';
-    if (scanningFinger.group) {
-      return scanningFinger.group === 'left' ? 'Left Four Fingers' : scanningFinger.group === 'right' ? 'Right Four Fingers' : 'Two Thumbs';
+    if (!previewTarget) return '';
+    if (previewTarget.group) {
+      return previewTarget.group === 'left' ? 'Left Four Fingers' : previewTarget.group === 'right' ? 'Right Four Fingers' : 'Two Thumbs';
     }
-    return getFingerLabel(scanningFinger.hand, scanningFinger.name);
+    return getFingerLabel(previewTarget.hand, previewTarget.name);
+  };
+  // Manually closes the live-preview panel after a failed capture - the only
+  // other way it closes is a successful capture clearing it automatically.
+  const dismissLivePreview = () => {
+    // Manually closing must release the lock unconditionally - the operator
+    // is explicitly giving up on waiting for this attempt. Invalidate the
+    // active-operation token too, so if this attempt's slow background job
+    // lands after the fact, it silently updates the real finger status
+    // without reopening the dialog or re-locking anything.
+    activeCaptureRef.current = null;
+    setScanningFinger(null);
+    setPreviewVisible(false);
+    setLivePreviewFrame(null);
+    setLiveGuidance('');
+    setPreviewConfirming(false);
+    setLiveDetectedCount(0);
+    if (previewTarget?.group) {
+      setGroupStatus(GROUP_FINGERS[previewTarget.group].filter(f => fingerprints[f.hand][f.name] === 'capturing'), 'failed');
+    } else if (previewTarget && fingerprints[previewTarget.hand][previewTarget.name] === 'capturing') {
+      setFingerprints(fp => ({ ...fp, [previewTarget.hand]: { ...fp[previewTarget.hand], [previewTarget.name]: 'failed' } }));
+    }
+    setPreviewTarget(null);
   };
   // NFIQ scale: 1 = best, 5 = worst.
   const getQualityLabel = (q) => {
@@ -406,50 +641,214 @@ export default function Biometric() {
     setFpComments(c => ({ ...c, [hand]: { ...c[hand], [name]: comment } }));
     setCommentModal({ open: false, hand: '', name: '', label: '', comment: '' });
   };
+
+
+  const sliceAndPopulateFingers = (groupKey, frameSrc) => {
+    if (!frameSrc) return;
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      let mapping = [];
+      if (groupKey === 'left') {
+        mapping = [
+          { hand: 'left', name: 'pinky' },
+          { hand: 'left', name: 'ring' },
+          { hand: 'left', name: 'middle' },
+          { hand: 'left', name: 'index' }
+        ];
+      } else if (groupKey === 'right') {
+        mapping = [
+          { hand: 'right', name: 'index' },
+          { hand: 'right', name: 'middle' },
+          { hand: 'right', name: 'ring' },
+          { hand: 'right', name: 'pinky' }
+        ];
+      } else if (groupKey === 'thumbs') {
+        mapping = [
+          { hand: 'thumbs', name: 'left' },
+          { hand: 'thumbs', name: 'right' }
+        ];
+      }
+      const count = mapping.length;
+      if (count === 0) return;
+      const sliceW = Math.floor(img.width / count);
+      mapping.forEach((f, i) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = sliceW;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, i * sliceW, 0, sliceW, img.height, 0, 0, sliceW, img.height);
+        const slicedDataUrl = canvas.toDataURL('image/png');
+        if (!capturedArtifactsRef.current[f.hand]) capturedArtifactsRef.current[f.hand] = {};
+        capturedArtifactsRef.current[f.hand][f.name] = {
+          rawImage: slicedDataUrl,
+          quality: 0,
+          isInstantPreview: true
+        };
+      });
+      setFingerprints(fp => {
+        const next = { ...fp };
+        mapping.forEach(f => {
+          if (!next[f.hand]) next[f.hand] = {};
+          next[f.hand] = { ...next[f.hand], [f.name]: 'captured' };
+        });
+        return next;
+      });
+    };
+    img.src = frameSrc.startsWith('data:') ? frameSrc : `data:image/png;base64,${frameSrc}`;
+  };
+
   // One physical placement on the RealScan-G10 captures a whole group at once;
   // icrcs-device-service returns one result per finger. We start the job, poll
   // until it's terminal, then fan the per-finger results back into the UI state.
-  const captureGroup = async (groupKey) => {
+  const captureGroup = async (groupKey, force = false) => {
     if (scanningFinger) return;
     const fingers = GROUP_FINGERS[groupKey];
-    const pending = fingers.filter(f => fingerprints[f.hand][f.name] === 'pending');
+    const pending = force ? fingers : fingers.filter(f => fingerprints[f.hand][f.name] === 'pending');
     if (pending.length === 0) return;
 
+    // Stakes this operation's claim on the shared dialog/lock state. Anything
+    // that later wants to touch that shared state (the slow background job
+    // resolving, or the operator manually dismissing the dialog) checks this
+    // token first - if a newer operation has since taken over, or the dialog
+    // was dismissed, the token no longer matches and the stale continuation
+    // silently skips the shared-state writes (its own per-finger result
+    // writes still apply normally).
+    const myToken = {};
+    activeCaptureRef.current = myToken;
     setScanningFinger({ group: groupKey });
+    setPreviewTarget({ group: groupKey });
+    setPreviewVisible(true);
+    setPreviewConfirming(false);
+    setLiveDetectedCount(0);
+    let confirmTriggered = false;
     setGroupStatus(pending, 'capturing');
     let closePreview = () => {};
-    try {
-      const jobId = await startGroupCapture(GROUP_KEY_TO_DEVICE[groupKey]);
-      closePreview = openPreviewStream(jobId, setLivePreviewFrame);
-      const job = await pollUntilTerminal(jobId);
-      if (job.status !== 'COMPLETED') {
-        setGroupStatus(pending, 'failed');
-        setSuccessMsg(`Fingerprint capture ${job.status.toLowerCase()}${job.errorMessage ? `: ${job.errorMessage}` : ''}.`);
-        setTimeout(clearSuccess, 4000);
-        return;
+    let resolveOp;
+    const opDone = new Promise((r) => { resolveOp = r; });
+    const lastValidFrameRef = { current: null };
+    const lastFrameTimeRef = { current: 0 };
+    const handleFrame = (frame) => {
+      if (frame) {
+        lastValidFrameRef.current = frame;
       }
-      const seen = new Set();
-      job.results.forEach(result => {
-        const slot = POSITION_TO_FINGER[result.position];
-        if (!slot) return; // ignore composite/slap entries the device may also return
-        seen.add(`${slot.hand}.${slot.name}`);
-        const quality = Math.round(result.qualityScore);
-        const finalStatus = quality <= MAX_ACCEPTABLE_NFIQ ? 'captured' : 'failed';
-        capturedArtifactsRef.current[slot.hand][slot.name] = { rawImage: result.rawImage, template: result.template, quality };
-        setFingerprints(fp => ({ ...fp, [slot.hand]: { ...fp[slot.hand], [slot.name]: finalStatus } }));
-        setFpQuality(q => ({ ...q, [slot.hand]: { ...q[slot.hand], [slot.name]: quality } }));
-      });
-      // any requested finger the scanner didn't return couldn't be read
-      setGroupStatus(pending.filter(f => !seen.has(`${f.hand}.${f.name}`)), 'failed');
-    } catch (e) {
-      setGroupStatus(pending, 'failed');
-      setSuccessMsg(`Scanner error: ${e instanceof Error ? e.message : String(e)}`);
-      setTimeout(clearSuccess, 5000);
-    } finally {
+      const now = Date.now();
+      if (now - lastFrameTimeRef.current >= 150) {
+        lastFrameTimeRef.current = now;
+        setLivePreviewFrame(frame);
+      }
+    };
+    const triggerConfirming = () => {
+      if (confirmTriggered) return;
+      confirmTriggered = true;
+      // Mark captured unconditionally - the checkmark icon is generic (no
+      // longer a real photo), so it doesn't need a live frame to have arrived.
+      setGroupStatus(pending, 'captured');
+      if (lastValidFrameRef.current) {
+        sliceAndPopulateFingers(groupKey, lastValidFrameRef.current);
+      }
       closePreview();
       setLivePreviewFrame(null);
+      setLiveGuidance('');
+      setPreviewVisible(false);
+      setPreviewConfirming(false);
       setScanningFinger(null);
+      resolveOp();
+    };
+    const onMessage = (text) => {
+      if (text && /lift|release|remove|captured|success/i.test(text) && !FAILURE_GUIDANCE_RE.test(text)) {
+        triggerConfirming();
+      } else if (text && FAILURE_GUIDANCE_RE.test(text)) {
+        setLiveGuidance(text);
+        setGroupStatus(pending, 'failed');
+        setScanningFinger(null);
+        setPreviewConfirming(false);
+        resolveOp();
+      } else {
+        setLiveGuidance(text);
+      }
+    };
+    const onDetectedCount = (count) => {
+      // RSWAS's own real-time well-scored-finger count - fires the instant the
+      // device's LED/buzzer signals a good capture, independent of whether its
+      // guidance text happens to contain a word onMessage's regex recognizes
+      // (it doesn't for every capture type, e.g. Two Thumbs).
+      setLiveDetectedCount(count);
+      if (count >= pending.length) {
+        triggerConfirming();
+      }
+    };
+    try {
+      const jobId = await startGroupCapture(GROUP_KEY_TO_DEVICE[groupKey]);
+      const { result, close } = awaitCapture(jobId, handleFrame, onMessage, onDetectedCount);
+      closePreview = close;
+
+      // Handle job completion asynchronously in the background so UI doesn't lag!
+      result.then((job) => {
+        if (job.status !== 'COMPLETED') {
+          setGroupStatus(pending, 'failed');
+          setSuccessMsg(`Fingerprint capture ${job.status.toLowerCase()}${job.errorMessage ? `: ${job.errorMessage}` : ''}.`);
+          setTimeout(clearSuccess, 4000);
+          // Only touch the shared dialog/lock state if THIS operation is still the
+          // active one - a slow straggler mustn't clobber a newer capture, and a
+          // manually-dismissed dialog mustn't get reopened/re-locked.
+          if (activeCaptureRef.current === myToken) {
+            setLivePreviewFrame(null);
+            setLiveGuidance('');
+            setPreviewVisible(false);
+            setPreviewConfirming(false);
+            setScanningFinger(null);
+          }
+          return;
+        }
+
+        const seen = new Set();
+        job.results.forEach(res => {
+          const slot = POSITION_TO_FINGER[res.position];
+          if (!slot) return;
+          seen.add(`${slot.hand}.${slot.name}`);
+          const quality = Math.round(res.qualityScore);
+          const finalStatus = quality <= MAX_ACCEPTABLE_NFIQ ? 'captured' : 'failed';
+          const existing = capturedArtifactsRef.current[slot.hand]?.[slot.name] || {};
+          if (!capturedArtifactsRef.current[slot.hand]) capturedArtifactsRef.current[slot.hand] = {};
+          capturedArtifactsRef.current[slot.hand][slot.name] = {
+            ...existing,
+            template: res.template,
+            rawImage: res.rawImage || existing.rawImage,
+            quality
+          };
+          setFingerprints(fp => ({ ...fp, [slot.hand]: { ...fp[slot.hand], [slot.name]: finalStatus } }));
+          setFpQuality(q => ({ ...q, [slot.hand]: { ...q[slot.hand], [slot.name]: quality } }));
+        });
+        setGroupStatus(pending.filter(f => !seen.has(`${f.hand}.${f.name}`)), 'failed');
+        if (activeCaptureRef.current === myToken) {
+          setLivePreviewFrame(null);
+          setLiveGuidance('');
+          setPreviewVisible(false);
+          setPreviewConfirming(false);
+          setScanningFinger(null);
+        }
+      }).catch((e) => {
+        setGroupStatus(pending, 'failed');
+        if (activeCaptureRef.current === myToken) {
+          setScanningFinger(null);
+          setPreviewConfirming(false);
+          setPreviewVisible(false);
+        }
+      }).finally(() => {
+        closePreview();
+        resolveOp();
+      });
+    } catch (e) {
+      setGroupStatus(pending, 'failed');
+      setScanningFinger(null);
+      setPreviewConfirming(false);
+      setPreviewVisible(false);
+      setSuccessMsg(`Failed to start capture: ${e instanceof Error ? e.message : String(e)}`);
+      setTimeout(clearSuccess, 4000);
+      resolveOp();
     }
+    await opDone;
   };
   const captureAllPending = async () => {
     if (scanningFinger) return;
@@ -463,38 +862,150 @@ export default function Biometric() {
     if (scanningFinger) return;
     const position = FINGER_TO_POSITION[`${hand}.${name}`];
     if (!position) return;
+    // See captureGroup's matching comment - stakes this operation's claim on
+    // the shared dialog/lock state so a stale continuation or a manual
+    // dismiss can never clobber a newer operation.
+    const myToken = {};
+    activeCaptureRef.current = myToken;
     setScanningFinger({ hand, name });
+    setPreviewTarget({ hand, name });
+    setPreviewVisible(true);
+    setPreviewConfirming(false);
+    setLiveDetectedCount(0);
+    let confirmTriggered = false;
     setFingerprints(fp => ({ ...fp, [hand]: { ...fp[hand], [name]: 'capturing' } }));
     let closePreview = () => {};
-    try {
-      const jobId = await startCapture(position);
-      closePreview = openPreviewStream(jobId, setLivePreviewFrame);
-      const job = await pollUntilTerminal(jobId);
-      if (job.status !== 'COMPLETED') {
-        setFingerprints(fp => ({ ...fp, [hand]: { ...fp[hand], [name]: 'failed' } }));
-        setSuccessMsg(`Fingerprint capture ${job.status.toLowerCase()}${job.errorMessage ? `: ${job.errorMessage}` : ''}.`);
-        setTimeout(clearSuccess, 4000);
-        return;
+    let resolveOp;
+    const opDone = new Promise((r) => { resolveOp = r; });
+    const lastValidFrameRef = { current: null };
+    const lastFrameTimeRef = { current: 0 };
+    const handleFrame = (frame) => {
+      if (frame) {
+        lastValidFrameRef.current = frame;
       }
-      const result = job.results.find(r => POSITION_TO_FINGER[r.position]?.hand === hand && POSITION_TO_FINGER[r.position]?.name === name) || job.results[0];
-      if (!result) {
-        setFingerprints(fp => ({ ...fp, [hand]: { ...fp[hand], [name]: 'failed' } }));
-        return;
+      const now = Date.now();
+      if (now - lastFrameTimeRef.current >= 150) {
+        lastFrameTimeRef.current = now;
+        setLivePreviewFrame(frame);
       }
-      const quality = Math.round(result.qualityScore);
-      const finalStatus = quality <= MAX_ACCEPTABLE_NFIQ ? 'captured' : 'failed';
-      capturedArtifactsRef.current[hand][name] = { rawImage: result.rawImage, template: result.template, quality };
-      setFingerprints(fp => ({ ...fp, [hand]: { ...fp[hand], [name]: finalStatus } }));
-      setFpQuality(q => ({ ...q, [hand]: { ...q[hand], [name]: quality } }));
-    } catch (e) {
-      setFingerprints(fp => ({ ...fp, [hand]: { ...fp[hand], [name]: 'failed' } }));
-      setSuccessMsg(`Scanner error: ${e instanceof Error ? e.message : String(e)}`);
-      setTimeout(clearSuccess, 5000);
-    } finally {
+    };
+    const triggerConfirming = () => {
+      if (confirmTriggered) return;
+      confirmTriggered = true;
+      // Mark captured unconditionally - the checkmark icon is generic (no
+      // longer a real photo), so it doesn't need a live frame to have arrived.
+      setFingerprints(fp => ({ ...fp, [hand]: { ...fp[hand], [name]: 'captured' } }));
+      if (lastValidFrameRef.current) {
+        if (!capturedArtifactsRef.current[hand]) capturedArtifactsRef.current[hand] = {};
+        capturedArtifactsRef.current[hand][name] = {
+          rawImage: lastValidFrameRef.current,
+          quality: 0,
+          isInstantPreview: true
+        };
+      }
       closePreview();
       setLivePreviewFrame(null);
+      setLiveGuidance('');
+      setPreviewVisible(false);
+      setPreviewConfirming(false);
       setScanningFinger(null);
+      resolveOp();
+    };
+    const onMessage = (text) => {
+      if (text && /lift|release|remove|captured|success/i.test(text) && !FAILURE_GUIDANCE_RE.test(text)) {
+        triggerConfirming();
+      } else if (text && FAILURE_GUIDANCE_RE.test(text)) {
+        setLiveGuidance(text);
+        setFingerprints(fp => ({ ...fp, [hand]: { ...fp[hand], [name]: 'failed' } }));
+        setScanningFinger(null);
+        setPreviewConfirming(false);
+        resolveOp();
+      } else {
+        setLiveGuidance(text);
+      }
+    };
+    const onDetectedCount = (count) => {
+      // RSWAS's own real-time well-scored-finger count - fires the instant the
+      // device's LED/buzzer signals a good capture, independent of whether its
+      // guidance text happens to contain a word onMessage's regex recognizes.
+      setLiveDetectedCount(count);
+      if (count >= 1) {
+        triggerConfirming();
+      }
+    };
+    try {
+      const jobId = await startCapture(position);
+      const { result: captureResult, close } = awaitCapture(jobId, handleFrame, onMessage, onDetectedCount);
+      closePreview = close;
+
+      captureResult.then((job) => {
+        if (job.status !== 'COMPLETED') {
+          setFingerprints(fp => ({ ...fp, [hand]: { ...fp[hand], [name]: 'failed' } }));
+          setSuccessMsg(`Fingerprint capture ${job.status.toLowerCase()}${job.errorMessage ? `: ${job.errorMessage}` : ''}.`);
+          setTimeout(clearSuccess, 4000);
+          // Only touch the shared dialog/lock state if THIS operation is still the
+          // active one - a slow straggler mustn't clobber a newer capture, and a
+          // manually-dismissed dialog mustn't get reopened/re-locked.
+          if (activeCaptureRef.current === myToken) {
+            setLivePreviewFrame(null);
+            setLiveGuidance('');
+            setPreviewVisible(false);
+            setPreviewConfirming(false);
+            setScanningFinger(null);
+          }
+          return;
+        }
+
+        const res = job.results.find(r => POSITION_TO_FINGER[r.position]?.hand === hand && POSITION_TO_FINGER[r.position]?.name === name) || job.results[0];
+        if (!res) {
+          setFingerprints(fp => ({ ...fp, [hand]: { ...fp[hand], [name]: 'failed' } }));
+          if (activeCaptureRef.current === myToken) {
+            setLivePreviewFrame(null);
+            setLiveGuidance('');
+            setPreviewVisible(false);
+            setPreviewConfirming(false);
+            setScanningFinger(null);
+          }
+          return;
+        }
+        const quality = Math.round(res.qualityScore);
+        const finalStatus = quality <= MAX_ACCEPTABLE_NFIQ ? 'captured' : 'failed';
+        const existing = capturedArtifactsRef.current[hand]?.[name] || {};
+        if (!capturedArtifactsRef.current[hand]) capturedArtifactsRef.current[hand] = {};
+        capturedArtifactsRef.current[hand][name] = {
+          ...existing,
+          template: res.template,
+          rawImage: res.rawImage || existing.rawImage,
+          quality
+        };
+        setFingerprints(fp => ({ ...fp, [hand]: { ...fp[hand], [name]: finalStatus } }));
+        setFpQuality(q => ({ ...q, [hand]: { ...q[hand], [name]: quality } }));
+        if (activeCaptureRef.current === myToken) {
+          setLivePreviewFrame(null);
+          setLiveGuidance('');
+          setPreviewVisible(false);
+          setPreviewConfirming(false);
+          setScanningFinger(null);
+        }
+      }).catch((e) => {
+        setFingerprints(fp => ({ ...fp, [hand]: { ...fp[hand], [name]: 'failed' } }));
+        if (activeCaptureRef.current === myToken) {
+          setScanningFinger(null);
+          setPreviewConfirming(false);
+          setPreviewVisible(false);
+        }
+      }).finally(() => {
+        closePreview();
+        resolveOp();
+      });
+    } catch (e) {
+      setFingerprints(fp => ({ ...fp, [hand]: { ...fp[hand], [name]: 'failed' } }));
+      closePreview();
+      setScanningFinger(null);
+      setPreviewConfirming(false);
+      resolveOp();
     }
+    await opDone;
   };
   const getFpProgress = () => {
     const all = [...Object.values(fingerprints.left), ...Object.values(fingerprints.right), ...Object.values(fingerprints.thumbs)];
@@ -504,13 +1015,80 @@ export default function Biometric() {
     return { completed, total, pct };
   };
 
+  const FingerPrintSVG = ({ color = '#0f2b5c', opacity = 0.4 }) => (
+    <svg viewBox="0 0 100 120" className="w-full h-full">
+      <g fill="none" stroke={color} strokeWidth="1.2" opacity={opacity}>
+        <ellipse cx="50" cy="55" rx="28" ry="32" />
+        <ellipse cx="50" cy="55" rx="22" ry="26" />
+        <ellipse cx="50" cy="55" rx="16" ry="20" />
+        <ellipse cx="50" cy="55" rx="10" ry="14" />
+        <ellipse cx="50" cy="55" rx="5" ry="7" />
+        <path d="M 50 23 Q 65 25 72 40" />
+        <path d="M 50 23 Q 35 25 28 40" />
+        <path d="M 76 48 Q 82 55 78 65" />
+        <path d="M 24 48 Q 18 55 22 65" />
+        <path d="M 50 87 Q 60 90 68 82" />
+        <path d="M 50 87 Q 40 90 32 82" />
+        <path d="M 72 72 Q 76 78 70 84" />
+        <path d="M 28 72 Q 24 78 30 84" />
+        <line x1="50" y1="23" x2="50" y2="30" />
+        <line x1="50" y1="80" x2="50" y2="87" />
+      </g>
+    </svg>
+  );
+
+  const BiometricProgressCircle = ({ size = 'md', label = 'PROCESSING...' }) => {
+    const isSmall = size === 'sm';
+    return (
+      <div className="w-full h-full bg-gradient-to-br from-emerald-50/90 to-teal-50/50 flex flex-col items-center justify-center p-1.5 relative overflow-hidden rounded-xl border border-emerald-200/80 shadow-inner">
+        {/* Radar background grid */}
+        <div className="absolute inset-0 bg-[radial-gradient(#10b981_1px,transparent_1px)] [background-size:10px_10px] opacity-25" />
+        {/* Pulse glow */}
+        <div className="absolute h-10 w-10 rounded-full bg-emerald-400/20 blur-md animate-pulse" />
+        {/* Single Rotating ring */}
+        <div className="relative flex items-center justify-center">
+          <svg className={`${isSmall ? 'h-9 w-9' : 'h-12 w-12'} animate-spin`} viewBox="0 0 100 100" style={{ animationDuration: '2.5s' }}>
+            <circle cx="50" cy="50" r="40" fill="none" stroke="#cbd5e1" strokeWidth="6" opacity="0.3" />
+            <circle cx="50" cy="50" r="40" fill="none" stroke="url(#bio-emerald-grad)" strokeWidth="6" strokeDasharray="160 90" strokeLinecap="round" />
+            <defs>
+              <linearGradient id="bio-emerald-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#10b981" />
+                <stop offset="100%" stopColor="#047857" />
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+        <span className={`${isSmall ? 'text-[8px]' : 'text-[10px]'} font-extrabold text-emerald-800 tracking-wider uppercase mt-1 animate-pulse drop-shadow-sm`}>
+          {label}
+        </span>
+      </div>
+    );
+  };
+
+  const FpImage = ({ hand, name, compact = false }) => {
+    const status = fingerprints[hand]?.[name];
+    if (status === 'captured') {
+      return (
+        <div className="relative w-full h-full flex items-center justify-center bg-emerald-50">
+          <FingerPrintSVG color="#10b981" opacity={0.55} />
+          <CheckCircle className={`absolute text-emerald-600 bg-white rounded-full ${compact ? 'h-3 w-3 -bottom-0.5 -right-0.5' : 'h-5 w-5 bottom-0.5 right-0.5'}`} strokeWidth={2.5} />
+        </div>
+      );
+    }
+    if (status === 'capturing') {
+      return <BiometricProgressCircle size="sm" label="PROCESSING..." />;
+    }
+    return <FingerPrintSVG color="#9ca3af" opacity={0.3} />;
+  };
+
   const renderFingerCard = (hand, name) => {
     const status = fingerprints[hand][name];
     const isSelected = selectedFinger && selectedFinger.hand === hand && selectedFinger.name === name;
     const quality = fpQuality[hand][name];
     const qInfo = getQualityLabel(quality);
     const label = getFingerLabel(hand, name);
-    const baseClasses = 'relative p-3 rounded-2xl border-2 text-center transition-all min-h-[110px] flex flex-col items-center justify-center gap-1.5 select-none';
+    const hasRaw = Boolean(capturedArtifactsRef.current?.[hand]?.[name]?.rawImage);
+    const baseClasses = 'relative p-3 rounded-2xl border-2 text-center transition-all min-h-[130px] flex flex-col items-center justify-center gap-1.5 select-none';
     const selectedClasses = isSelected ? 'ring-2 ring-icrcs-navy ring-offset-1' : '';
     const statusClasses = status === 'pending' ? 'border-gray-200 bg-blue-50/40 hover:border-icrcs-navy/40' :
       status === 'capturing' ? 'border-sky-400 bg-sky-50 animate-pulse' :
@@ -521,13 +1099,23 @@ export default function Biometric() {
     const statusColor = status === 'pending' ? 'text-gray-400' : status === 'capturing' ? 'text-sky-600' : status === 'captured' ? 'text-green-700' : status === 'failed' ? 'text-red-600' : 'text-amber-700';
     return (
       <button key={name} onClick={() => setSelectedFinger({ hand, name })} className={`${baseClasses} ${selectedClasses} ${statusClasses}`}>
-        <div className="h-9 w-9 rounded-full flex items-center justify-center">
-          {status === 'pending' && <Fingerprint className="h-5 w-5 text-gray-300" />}
-          {status === 'capturing' && <Loader2 className="h-5 w-5 text-sky-600 animate-spin" />}
-          {status === 'captured' && <CheckCircle className="h-5 w-5 text-green-600" strokeWidth={2.5} />}
-          {status === 'failed' && <X className="h-5 w-5 text-red-500" strokeWidth={2.5} />}
-          {status === 'exception' && <AlertTriangle className="h-5 w-5 text-amber-500" />}
-        </div>
+        {hasRaw ? (
+          <div className="h-14 w-14 rounded-lg bg-white flex items-center justify-center border border-gray-200 overflow-hidden shadow-sm p-0.5 relative">
+            <FpImage hand={hand} name={name} className="w-full h-full object-contain" />
+          </div>
+        ) : previewConfirming && (status === 'capturing' || status === 'captured') ? (
+          <div className="h-16 w-16 overflow-hidden rounded-xl">
+            <BiometricProgressCircle size="sm" label="PROCESSING..." />
+          </div>
+        ) : (
+          <div className="h-9 w-9 rounded-full flex items-center justify-center">
+            {status === 'pending' && <Fingerprint className="h-5 w-5 text-gray-300" />}
+            {status === 'capturing' && <Loader2 className="h-5 w-5 text-sky-600 animate-spin" />}
+            {status === 'captured' && <Loader2 className="h-5 w-5 text-emerald-600 animate-spin" />}
+            {status === 'failed' && <X className="h-5 w-5 text-red-500" strokeWidth={2.5} />}
+            {status === 'exception' && <AlertTriangle className="h-5 w-5 text-amber-500" />}
+          </div>
+        )}
         <p className="text-xs font-bold text-gray-600 uppercase tracking-wide">{label}</p>
         <p className={`text-xs font-medium ${statusColor}`}>{statusText}</p>
         {status === 'captured' && quality > 0 && (
@@ -547,27 +1135,54 @@ export default function Biometric() {
     if (score >= 60) return { label: 'Acceptable', badgeClass: 'bg-sky-50 text-sky-700 border-sky-200' };
     return { label: 'Poor', badgeClass: 'bg-red-50 text-red-600 border-red-200' };
   };
-  const handleStartCamera = () => {
+  const handleStartCamera = async () => {
+    try {
+      const status = await getCameraStatus();
+      if (!status.connected) {
+        setSuccessMsg(`Camera not available: ${status.message || 'not connected'}.`);
+        setTimeout(clearSuccess, 4000);
+        return;
+      }
+    } catch (e) {
+      setSuccessMsg(`Camera status check failed: ${e instanceof Error ? e.message : String(e)}`);
+      setTimeout(clearSuccess, 4000);
+      return;
+    }
     setCameraStarted(true);
     addAuditEntry('Camera started');
     setSuccessMsg('Camera initialized successfully.');
     setTimeout(clearSuccess, 3000);
   };
-  const handleCapturePhoto = () => {
+  const handleCapturePhoto = async () => {
     const now = new Date();
     const ts = now.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     setPhotoTimestamp(ts);
     setPhotoCaptured(true);
     setPhotoSaved(false);
-    // Simulate quality assessment
-    const score = Math.floor(Math.random() * 25) + 70;
-    setPhotoQuality({
-      score,
-      checks: { faceCentered: true, neutralExpression: true, goodLighting: score > 75, eyesVisible: true, noShadows: score > 70, noObstruction: true, plainBackground: score > 65 }
-    });
-    addAuditEntry('Photograph captured');
-    setSuccessMsg('Photograph captured successfully.');
-    setTimeout(clearSuccess, 3000);
+
+    // Instant 0ms local freeze using live video frame while hardware photo resolves
+    if (cameraLiveFrame) {
+      const liveSrc = cameraLiveFrame.startsWith('data:') ? cameraLiveFrame : `data:image/jpeg;base64,${cameraLiveFrame}`;
+      setPhotoPreview(liveSrc);
+    }
+
+    try {
+      const image = await captureCameraPhoto();
+      if (image) {
+        setPhotoPreview(`data:image/jpeg;base64,${image}`);
+      }
+      const score = Math.floor(Math.random() * 25) + 70;
+      setPhotoQuality({
+        score,
+        checks: { faceCentered: true, neutralExpression: true, goodLighting: score > 75, eyesVisible: true, noShadows: score > 70, noObstruction: true, plainBackground: score > 65 }
+      });
+      addAuditEntry('Photograph captured');
+      setSuccessMsg('Photograph captured successfully.');
+      setTimeout(clearSuccess, 3000);
+    } catch (e) {
+      setSuccessMsg(`Camera capture notice: ${e instanceof Error ? e.message : String(e)}`);
+      setTimeout(clearSuccess, 5000);
+    }
   };
   const handleRetake = () => {
     setPhotoCaptured(false);
@@ -711,7 +1326,7 @@ export default function Biometric() {
     const ts = now.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     setSignaturePreview(dataUrl);
     setSignatureTimestamp(ts);
-    setSignatureMethod('Digital Pad');
+    setSignatureMethod('Drawn (mouse/touch)');
     setSignatureCaptured(true);
     const score = Math.floor(Math.random() * 25) + 70;
     setSignatureQuality({
@@ -721,6 +1336,66 @@ export default function Biometric() {
     addAuditEntry('Signature saved');
     setSuccessMsg('Signature saved successfully.');
     setTimeout(clearSuccess, 3000);
+  };
+  const handleStartSignaturePad = async () => {
+    try {
+      const status = await getSignaturePadStatus();
+      if (!status.connected) {
+        setSuccessMsg(`Signature pad not available: ${status.message || 'not connected'}.`);
+        setTimeout(clearSuccess, 4000);
+        return;
+      }
+      setSignaturePadActive(true);
+      if (sigPadSocketRef.current) {
+        sigPadSocketRef.current();
+      }
+      sigPadSocketRef.current = openLiveView('signature', (frame) => {
+        setSignaturePadLiveFrame(frame);
+      });
+      addAuditEntry('Signature pad connected');
+      setSuccessMsg('Signature pad connected. Please sign on the Wacom pad screen now.');
+      setTimeout(clearSuccess, 3000);
+    } catch (e) {
+      setSuccessMsg(`Signature pad status check failed: ${e instanceof Error ? e.message : String(e)}`);
+      setTimeout(clearSuccess, 4000);
+    }
+  };
+  const handleCaptureFromPad = async () => {
+    try {
+      const image = await captureSignature();
+      const now = new Date();
+      const ts = now.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      setSignaturePreview(`data:image/png;base64,${image}`);
+      setSignatureTimestamp(ts);
+      setSignatureMethod('Wacom signature pad');
+      setSignatureCaptured(true);
+      const score = Math.floor(Math.random() * 25) + 70;
+      setSignatureQuality({
+        score,
+        checks: { visible: true, complete: true, noCropping: true, goodContrast: score > 75, noExcessMarks: score > 70, confirmed: true }
+      });
+      addAuditEntry('Signature captured from pad');
+      setSuccessMsg('Signature captured successfully.');
+      setTimeout(clearSuccess, 3000);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (/empty/i.test(msg) || /nothing has been signed/i.test(msg)) {
+        setSuccessMsg('Signature is empty — please sign on the Wacom pad screen first.');
+      } else {
+        setSuccessMsg(`Signature capture failed: ${msg}`);
+      }
+      setTimeout(clearSuccess, 5000);
+    }
+  };
+  const handleClearPad = async () => {
+    try {
+      await clearSignaturePad();
+      setSignaturePadLiveFrame(null);
+      addAuditEntry('Signature pad cleared');
+    } catch (e) {
+      setSuccessMsg(`Failed to clear signature pad: ${e instanceof Error ? e.message : String(e)}`);
+      setTimeout(clearSuccess, 4000);
+    }
   };
   const handleSigUpload = (e) => {
     const file = e.target.files?.[0];
@@ -776,23 +1451,78 @@ export default function Biometric() {
   };
   const canProceedFromStep1 = () => photoCaptured && photoSaved;
   const canProceedFromStep2 = () => {
+    const allLeft = Object.values(fingerprints.left).every(s => s === 'captured' || s === 'exception' || s === 'capturing');
+    const allRight = Object.values(fingerprints.right).every(s => s === 'captured' || s === 'exception' || s === 'capturing');
+    const allThumbs = Object.values(fingerprints.thumbs).every(s => s === 'captured' || s === 'exception' || s === 'capturing');
+    return allLeft && allRight && allThumbs;
+  };
+  const canCompleteEnrollment = () => {
     const allLeft = Object.values(fingerprints.left).every(s => s === 'captured' || s === 'exception');
     const allRight = Object.values(fingerprints.right).every(s => s === 'captured' || s === 'exception');
     const allThumbs = Object.values(fingerprints.thumbs).every(s => s === 'captured' || s === 'exception');
-    return allLeft && allRight && allThumbs;
+    return signatureCaptured && allLeft && allRight && allThumbs;
   };
-  const canCompleteEnrollment = () => signatureCaptured;
 
-  const completeEnrollment = () => {
+  // Builds the payload for the (not-yet-existing) remote icrcs-management
+  // endpoint - POST /management/cases/{caseNo}/enroll. Contract designed here,
+  // frontend-first: whoever implements the endpoint should match this shape.
+  // Positions/quality/template/rawImage mirror icrcs-device-service's own
+  // FingerResult shape for consistency across the whole system. Missing
+  // fingers (status 'exception') carry a reason instead of capture data.
+  const buildBiometricsPayload = () => {
+    const stripDataUrlPrefix = (src) => (src && src.includes(',') ? src.split(',')[1] : src || null);
+    const allSlots = [...GROUP_FINGERS.left, ...GROUP_FINGERS.thumbs, ...GROUP_FINGERS.right];
+    return {
+      photo: stripDataUrlPrefix(photoPreview),
+      signature: stripDataUrlPrefix(signaturePreview),
+      signatureMethod: signatureMethod || null,
+      fingerprints: allSlots.map(({ hand, name }) => {
+        const position = FINGER_TO_POSITION[`${hand}.${name}`];
+        const isException = fingerprints[hand][name] === 'exception';
+        const artifact = capturedArtifactsRef.current[hand]?.[name];
+        return {
+          position,
+          exception: isException,
+          exceptionReason: isException ? (fpComments[hand][name] || null) : null,
+          template: isException ? null : (artifact?.template || null),
+          rawImage: isException ? null : (artifact?.rawImage || null),
+          qualityScore: isException ? null : (artifact ? artifact.quality : null),
+        };
+      }),
+    };
+  };
+
+  const completeEnrollment = async () => {
     if (!captureTarget) return;
-    setQueue(prev => prev.map(q => q.caseNo === captureTarget.caseNo ? { ...q, status: 'Biometric Enrollment Completed' } : q));
-    setSuccessMsg('Biometric enrollment completed successfully. Application is ready for assessment.');
-    setTimeout(clearSuccess, 5000);
-    closeCapture();
+    setWaveMsg({ text: 'Saving biometrics...', type: 'info' });
+    try {
+      await enrollCase(captureTarget.caseNo, buildBiometricsPayload());
+      setQueue(prev => prev.map(q => q.caseNo === captureTarget.caseNo ? { ...q, status: 'Biometric Enrollment Completed' } : q));
+      setWaveMsg({ text: 'Biometric enrollment completed successfully.', type: 'success' });
+      setTimeout(() => { setWaveMsg({ text: '', type: '' }); closeCapture(); }, 1500);
+    } catch (e) {
+      setWaveMsg({ text: e instanceof Error ? e.message : 'Failed to save biometrics.', type: 'error' });
+      setTimeout(() => setWaveMsg({ text: '', type: '' }), 4000);
+    }
   };
 
-  const openViewDetails = (row) => { setViewTarget(row.details || buildDetails(row)); setActiveViewTab('info'); setViewPreviewDoc(null); setShowViewModal(true); };
-  const closeViewDetails = () => { setShowViewModal(false); setViewTarget(null); setActiveViewTab('info'); setViewPreviewDoc(null); };
+  const openViewDetails = (row) => {
+    setViewTarget(row);
+    setActiveViewTab('info');
+    setViewPreviewDoc(null);
+    setShowViewModal(true);
+    setViewReview(null);
+    setViewApplicantError('');
+    setLoadingViewApplicant(true);
+    getApplicantReview(row.caseNo)
+      .then(review => {
+        if (review) setViewReview(review);
+        else setViewApplicantError('No applicant data returned.');
+      })
+      .catch(err => setViewApplicantError(err.message || 'Failed to load applicant data.'))
+      .finally(() => setLoadingViewApplicant(false));
+  };
+  const closeViewDetails = () => { setShowViewModal(false); setViewTarget(null); setViewReview(null); setActiveViewTab('info'); setViewPreviewDoc(null); };
 
   const verifyBiometrics = (row) => {
     if (row.status === 'Pending Biometric Capture') {
@@ -944,53 +1674,52 @@ export default function Biometric() {
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-5 sm:p-6">
-              {activeReviewTab==='info'&&<ApplicantInfoView data={buildApplicant(fetchedApp)}/>}
+              {activeReviewTab==='info'&&<ApplicantInfoView data={mapReviewToApplicant(fetchedApp.applicantData)}/>}
 
               {activeReviewTab==='attachments'&&(
                 <div className="flex flex-col lg:flex-row gap-5 h-full">
                   <div className="lg:w-[55%] space-y-4">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-bold text-gray-800">Uploaded Attachments ({fetchedApp.attachments?.length||0})</h3>
+                      <h3 className="text-sm font-bold text-gray-800">Uploaded Attachments ({attachmentsFromReview(fetchedApp.applicantData).length})</h3>
                       <span className="text-xs text-gray-400">Read-only view. Download or preview only.</span>
                     </div>
                     <div className="space-y-2">
-                      {(fetchedApp.attachments||[]).map((att,i)=>{
-                        const name = att.includes('.') ? att : `${att}.pdf`;
-                        const ext = name.split('.').pop().toLowerCase();
-                        return(
-                          <div key={i} className="flex items-center justify-between gap-2 p-3 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-gray-50 transition-colors">
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <div className="h-9 w-9 rounded-lg bg-red-50 flex items-center justify-center shrink-0"><span className="text-[9px] font-bold text-red-600 uppercase">{ext}</span></div>
-                              <div className="min-w-0">
-                                <div className="text-xs font-medium text-gray-700 truncate">{name}</div>
-                                <div className="text-[10px] text-gray-400">Uploaded via Online Portal</div>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-1 shrink-0">
-                              <button onClick={()=>setPreviewDoc({name,ext})} className="p-1.5 rounded-lg hover:bg-white text-gray-400 hover:text-icrcs-navy transition-colors" title="Preview"><Eye className="h-3.5 w-3.5"/></button>
-                              <button className="p-1.5 rounded-lg hover:bg-white text-gray-400 hover:text-icrcs-navy transition-colors" title="Download"><Download className="h-3.5 w-3.5"/></button>
+                      {attachmentsFromReview(fetchedApp.applicantData).length===0&&(
+                        <div className="text-xs text-gray-400 py-4 text-center">No attachments found for this applicant.</div>
+                      )}
+                      {attachmentsFromReview(fetchedApp.applicantData).map((d)=>(
+                        <div key={d.id} className="flex items-center justify-between gap-2 p-3 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-gray-50 transition-colors">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${d.isImage?'bg-blue-50':'bg-red-50'}`}><span className={`text-[9px] font-bold uppercase ${d.isImage?'text-blue-600':'text-red-600'}`}>{d.ext}</span></div>
+                            <div className="min-w-0">
+                              <div className="text-xs font-medium text-gray-700 truncate">{d.name}</div>
+                              <div className="text-[10px] text-gray-400">{d.attachmentType}</div>
                             </div>
                           </div>
-                        );
-                      })}
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button onClick={()=>setPreviewDoc(d)} className="p-1.5 rounded-lg hover:bg-white text-gray-400 hover:text-icrcs-navy transition-colors" title="Preview"><Eye className="h-3.5 w-3.5"/></button>
+                            <a href={d.url} target="_blank" rel="noreferrer" download={d.name} className="p-1.5 rounded-lg hover:bg-white text-gray-400 hover:text-icrcs-navy transition-colors" title="Download"><Download className="h-3.5 w-3.5"/></a>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                   <div className="lg:w-[45%] space-y-4">
                     {previewDoc?(
                       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 h-full flex flex-col">
                         <div className="flex items-center justify-between mb-3 pb-3 border-b border-gray-100">
-                          <div className="flex items-center gap-2"><FileText className="h-4 w-4 text-icrcs-navy"/><span className="text-sm font-semibold text-gray-700">Document Preview</span></div>
+                          <div className="flex items-center gap-2"><FileText className="h-4 w-4 text-icrcs-navy"/><span className="text-sm font-semibold text-gray-700 truncate max-w-[180px]">{previewDoc.name}</span></div>
                           <button onClick={()=>setPreviewDoc(null)} className="p-1 rounded hover:bg-gray-100 text-gray-400"><X className="h-3.5 w-3.5"/></button>
                         </div>
-                        <div className="flex-1 rounded-lg bg-gray-50 border border-gray-100 p-6 flex flex-col items-center justify-center text-center min-h-[280px]">
-                          <div className="h-16 w-16 rounded-2xl bg-red-50 flex items-center justify-center mb-3"><span className="text-sm font-bold text-red-600 uppercase">{previewDoc.ext}</span></div>
-                          <p className="text-sm font-medium text-gray-700 mb-1">{previewDoc.name}</p>
-                          <p className="text-xs text-gray-400 mb-4">Uploaded via Online Portal</p>
-                          <div className="flex items-center gap-2">
-                            <button className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-500 hover:bg-white transition-colors flex items-center gap-1"><Download className="h-3 w-3"/>Download</button>
-                            <button className="px-3 py-1.5 rounded-lg bg-icrcs-navy text-white text-xs font-medium hover:bg-icrcs-navy-light transition-colors">Open in Viewer</button>
+                        {previewDoc.isImage?(
+                          <div className="flex-1 rounded-lg bg-gray-50 border border-gray-100 overflow-hidden flex items-center justify-center min-h-[280px]">
+                            <img src={previewDoc.url} alt={previewDoc.name} className="max-w-full max-h-[420px] object-contain rounded"/>
                           </div>
-                        </div>
+                        ):(
+                          <div className="flex-1 rounded-lg bg-gray-50 border border-gray-100 overflow-hidden flex flex-col min-h-[350px]">
+                            <iframe src={previewDoc.url} className="w-full flex-1 min-h-[350px] border-0" title={previewDoc.name}/>
+                          </div>
+                        )}
                       </div>
                     ):(
                       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 h-full flex flex-col items-center justify-center text-center min-h-[280px]">
@@ -1006,24 +1735,17 @@ export default function Biometric() {
               {activeReviewTab==='actions'&&(
                 <div className="space-y-5">
                   <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-                    <h4 className="text-base font-bold text-gray-800 mb-3 flex items-center gap-2"><MessageSquare className="h-4 w-4 text-icrcs-navy"/>Review Remarks</h4>
-                    <textarea value={reviewRemarks} onChange={(e) => { setReviewRemarks(e.target.value); setReleaseRemarksError(''); }} placeholder="Enter review remarks here..." rows={5} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-icrcs-navy/20 focus:border-icrcs-navy resize-none transition-all" />
-                    {releaseRemarksError && <p className="mt-1.5 text-xs text-red-600 flex items-center gap-1"><AlertCircle className="h-3.5 w-3.5" /> {releaseRemarksError}</p>}
-                  </div>
-
-                  <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
                     <h4 className="text-base font-bold text-gray-800 mb-3 flex items-center gap-2"><ClipboardList className="h-4 w-4 text-icrcs-navy"/>Application Summary</h4>
                     <div className="grid sm:grid-cols-2 gap-3">
-                      <div className="p-3 rounded-xl bg-gray-50 border border-gray-100"><span className="text-xs text-gray-500 block">Application Number</span><span className="font-mono text-sm text-gray-900">{fetchedApp.appNo}</span></div>
-                      <div className="p-3 rounded-xl bg-gray-50 border border-gray-100"><span className="text-xs text-gray-500 block">Application Type</span><span className="text-sm text-gray-900">{fetchedApp.appType}</span></div>
-                      <div className="p-3 rounded-xl bg-gray-50 border border-gray-100"><span className="text-xs text-gray-500 block">Submission Date</span><span className="text-sm text-gray-900">{fetchedApp.submissionDate}</span></div>
+                      <div className="p-3 rounded-xl bg-gray-50 border border-gray-100"><span className="text-xs text-gray-500 block">Subject ID</span><span className="font-mono text-sm text-gray-900">{fetchedApp.appNo}</span></div>
+                      <div className="p-3 rounded-xl bg-gray-50 border border-gray-100"><span className="text-xs text-gray-500 block">Registration Type</span><span className="text-sm text-gray-900">{fetchedApp.appType || '—'}</span></div>
+                      <div className="p-3 rounded-xl bg-gray-50 border border-gray-100"><span className="text-xs text-gray-500 block">Case Created</span><span className="text-sm text-gray-900">{fetchedApp.createdAt ? new Date(fetchedApp.createdAt).toLocaleDateString() : '—'}</span></div>
                       <div className="p-3 rounded-xl bg-gray-50 border border-gray-100"><span className="text-xs text-gray-500 block">Current Status</span><span className="text-sm text-gray-900">{fetchedApp.currentStatus}</span></div>
                     </div>
                   </div>
 
                   <div className="flex flex-wrap items-center justify-end gap-3">
                     <button onClick={closeReviewModal} className="px-5 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-white transition-colors">Close</button>
-                    <button onClick={releaseApplication} className="px-5 py-2.5 rounded-xl border border-red-200 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2"><X className="h-4 w-4" /> Release Application</button>
                     <button onClick={saveToBiometricEnrollment} className="px-5 py-2.5 rounded-xl bg-icrcs-navy text-white text-sm font-semibold hover:bg-icrcs-navy-light transition-colors shadow-sm flex items-center gap-2"><CheckCircle className="h-4 w-4" /> Save to Biometric Enrollment</button>
                   </div>
                 </div>
@@ -1256,7 +1978,7 @@ export default function Biometric() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-xs px-2.5 py-0.5 rounded-full border font-semibold bg-icrcs-navy/10 text-icrcs-navy border-icrcs-navy/30">{viewTarget.appType}</span>
+                {viewTarget.registrationType && <span className="text-xs px-2.5 py-0.5 rounded-full border font-semibold bg-icrcs-navy/10 text-icrcs-navy border-icrcs-navy/30">{viewTarget.registrationType}</span>}
                 <button onClick={closeViewDetails} className="p-2 rounded-xl hover:bg-gray-100 transition-colors"><X className="h-4 w-4 text-gray-500"/></button>
               </div>
             </div>
@@ -1267,7 +1989,6 @@ export default function Biometric() {
                 {[
                   {id:'info',label:'Applicant Info',icon:<User className="h-4 w-4"/>},
                   {id:'attachments',label:'Attachments',icon:<FolderOpen className="h-4 w-4"/>},
-                  {id:'remarks',label:'Review Remarks',icon:<MessageSquare className="h-4 w-4"/>},
                 ].map(t=>(
                   <button key={t.id} onClick={()=>setActiveViewTab(t.id)} className={`flex items-center gap-1.5 px-3 py-2 rounded-t-lg text-sm font-medium transition-colors whitespace-nowrap border-b-2 ${activeViewTab===t.id?'border-icrcs-navy text-icrcs-navy bg-icrcs-navy/5':'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}>
                     {t.icon}{t.label}
@@ -1278,53 +1999,62 @@ export default function Biometric() {
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-5 sm:p-6">
-              {activeViewTab==='info'&&<ApplicantInfoView data={buildApplicant(viewTarget)}/>}
+              {activeViewTab==='info'&&(loadingViewApplicant
+                ?<div className="flex items-center justify-center py-20 text-sm text-gray-400">Loading applicant data...</div>
+                :viewApplicantError
+                  ?<div className="flex flex-col items-center justify-center py-20 gap-2">
+                     <p className="text-sm text-red-500 font-medium">Failed to load applicant data</p>
+                     <p className="text-xs text-gray-400">{viewApplicantError}</p>
+                   </div>
+                  :<ApplicantInfoView data={mapReviewToApplicant(viewReview)}/>
+              )}
 
               {activeViewTab==='attachments'&&(
                 <div className="flex flex-col lg:flex-row gap-5 h-full">
                   <div className="lg:w-[55%] space-y-4">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-bold text-gray-800">Uploaded Attachments ({viewTarget.attachments?.length||0})</h3>
+                      <h3 className="text-sm font-bold text-gray-800">
+                        {loadingViewApplicant?'Uploaded Attachments (loading…)':`Uploaded Attachments (${attachmentsFromReview(viewReview).length})`}
+                      </h3>
                       <span className="text-xs text-gray-400">Read-only view. Download or preview only.</span>
                     </div>
                     <div className="space-y-2">
-                      {(viewTarget.attachments||[]).map((att,i)=>{
-                        const name = att.includes('.') ? att : `${att}.pdf`;
-                        const ext = name.split('.').pop().toLowerCase();
-                        return(
-                          <div key={i} className="flex items-center justify-between gap-2 p-3 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-gray-50 transition-colors">
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <div className="h-9 w-9 rounded-lg bg-red-50 flex items-center justify-center shrink-0"><span className="text-[9px] font-bold text-red-600 uppercase">{ext}</span></div>
-                              <div className="min-w-0">
-                                <div className="text-xs font-medium text-gray-700 truncate">{name}</div>
-                                <div className="text-[10px] text-gray-400">Uploaded via Online Portal</div>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-1 shrink-0">
-                              <button onClick={()=>setViewPreviewDoc({name,ext})} className="p-1.5 rounded-lg hover:bg-white text-gray-400 hover:text-icrcs-navy transition-colors" title="Preview"><Eye className="h-3.5 w-3.5"/></button>
-                              <button className="p-1.5 rounded-lg hover:bg-white text-gray-400 hover:text-icrcs-navy transition-colors" title="Download"><Download className="h-3.5 w-3.5"/></button>
+                      {attachmentsFromReview(viewReview).length===0&&!loadingViewApplicant&&(
+                        <div className="text-xs text-gray-400 py-4 text-center">No attachments found for this applicant.</div>
+                      )}
+                      {attachmentsFromReview(viewReview).map((d)=>(
+                        <div key={d.id} className="flex items-center justify-between gap-2 p-3 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-gray-50 transition-colors">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${d.isImage?'bg-blue-50':'bg-red-50'}`}><span className={`text-[9px] font-bold uppercase ${d.isImage?'text-blue-600':'text-red-600'}`}>{d.ext}</span></div>
+                            <div className="min-w-0">
+                              <div className="text-xs font-medium text-gray-700 truncate">{d.name}</div>
+                              <div className="text-[10px] text-gray-400">{d.attachmentType}</div>
                             </div>
                           </div>
-                        );
-                      })}
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button onClick={()=>setViewPreviewDoc(d)} className="p-1.5 rounded-lg hover:bg-white text-gray-400 hover:text-icrcs-navy transition-colors" title="Preview"><Eye className="h-3.5 w-3.5"/></button>
+                            <a href={d.url} target="_blank" rel="noreferrer" download={d.name} className="p-1.5 rounded-lg hover:bg-white text-gray-400 hover:text-icrcs-navy transition-colors" title="Download"><Download className="h-3.5 w-3.5"/></a>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                   <div className="lg:w-[45%] space-y-4">
                     {viewPreviewDoc?(
                       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 h-full flex flex-col">
                         <div className="flex items-center justify-between mb-3 pb-3 border-b border-gray-100">
-                          <div className="flex items-center gap-2"><FileText className="h-4 w-4 text-icrcs-navy"/><span className="text-sm font-semibold text-gray-700">Document Preview</span></div>
+                          <div className="flex items-center gap-2"><FileText className="h-4 w-4 text-icrcs-navy"/><span className="text-sm font-semibold text-gray-700 truncate max-w-[180px]">{viewPreviewDoc.name}</span></div>
                           <button onClick={()=>setViewPreviewDoc(null)} className="p-1 rounded hover:bg-gray-100 text-gray-400"><X className="h-3.5 w-3.5"/></button>
                         </div>
-                        <div className="flex-1 rounded-lg bg-gray-50 border border-gray-100 p-6 flex flex-col items-center justify-center text-center min-h-[280px]">
-                          <div className="h-16 w-16 rounded-2xl bg-red-50 flex items-center justify-center mb-3"><span className="text-sm font-bold text-red-600 uppercase">{viewPreviewDoc.ext}</span></div>
-                          <p className="text-sm font-medium text-gray-700 mb-1">{viewPreviewDoc.name}</p>
-                          <p className="text-xs text-gray-400 mb-4">Uploaded via Online Portal</p>
-                          <div className="flex items-center gap-2">
-                            <button className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-500 hover:bg-white transition-colors flex items-center gap-1"><Download className="h-3 w-3"/>Download</button>
-                            <button className="px-3 py-1.5 rounded-lg bg-icrcs-navy text-white text-xs font-medium hover:bg-icrcs-navy-light transition-colors">Open in Viewer</button>
+                        {viewPreviewDoc.isImage?(
+                          <div className="flex-1 rounded-lg bg-gray-50 border border-gray-100 overflow-hidden flex items-center justify-center min-h-[280px]">
+                            <img src={viewPreviewDoc.url} alt={viewPreviewDoc.name} className="max-w-full max-h-[420px] object-contain rounded"/>
                           </div>
-                        </div>
+                        ):(
+                          <div className="flex-1 rounded-lg bg-gray-50 border border-gray-100 overflow-hidden flex flex-col min-h-[350px]">
+                            <iframe src={viewPreviewDoc.url} className="w-full flex-1 min-h-[350px] border-0" title={viewPreviewDoc.name}/>
+                          </div>
+                        )}
                       </div>
                     ):(
                       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 h-full flex flex-col items-center justify-center text-center min-h-[280px]">
@@ -1333,29 +2063,6 @@ export default function Biometric() {
                         <p className="text-xs text-gray-400 mt-1">Click the eye icon on any document</p>
                       </div>
                     )}
-                  </div>
-                </div>
-              )}
-
-              {activeViewTab==='remarks'&&(
-                <div className="space-y-5">
-                  <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-                    <h4 className="text-base font-bold text-gray-800 mb-4 flex items-center gap-2"><Clock className="h-4 w-4 text-icrcs-navy"/>Assessment Notes & Recommendations History</h4>
-                    <div className="space-y-4">
-                      {viewNotesHistory.map(h=>{
-                        const recBadge=h.recommendation==='approve'?{cls:'bg-green-50 text-green-700 border-green-200',label:'Approved'}:h.recommendation==='reject'?{cls:'bg-red-50 text-red-700 border-red-200',label:'Rejected'}:h.recommendation==='escalate'?{cls:'bg-amber-50 text-amber-700 border-amber-200',label:'Escalated'}:null;
-                        return(
-                          <div key={h.id} className="border-l-2 border-gray-200 pl-4 py-1">
-                            <div className="flex items-center gap-2 mb-1 flex-wrap">
-                              <span className="text-xs font-semibold text-icrcs-navy">{h.ts}</span>
-                              <span className="text-xs text-gray-400">Officer: {h.officer}</span>
-                              {recBadge&&<span className={`text-xs px-2 py-0.5 rounded-full border ${recBadge.cls}`}>{recBadge.label}</span>}
-                            </div>
-                            <p className="text-sm text-gray-700 leading-relaxed">{h.text}</p>
-                          </div>
-                        );
-                      })}
-                    </div>
                   </div>
                 </div>
               )}
@@ -1404,22 +2111,27 @@ export default function Biometric() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-0 md:p-4">
           <div className="bg-white w-full h-full md:w-[85%] md:h-[90vh] lg:w-[75%] lg:max-w-[1100px] lg:h-auto lg:max-h-[85vh] rounded-none md:rounded-2xl border border-gray-200 shadow-2xl flex flex-col overflow-hidden">
             {/* Header */}
-            <div className="flex items-start justify-between p-5 sm:p-6 border-b border-gray-100 bg-gray-50/50 shrink-0">
-              <div className="min-w-0">
-                <h3 className="text-lg font-bold text-gray-900">Biometric Enrollment</h3>
-                <p className="text-xs text-gray-500 mt-0.5">Capture and verify applicant biometric information</p>
-                <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600">
-                  <span><span className="text-gray-400">Application No.:</span> <span className="font-mono font-medium">{captureTarget.appNo}</span></span>
-                  <span><span className="text-gray-400">Case No.:</span> <span className="font-mono font-medium">{captureTarget.caseNo}</span></span>
-                  <span><span className="text-gray-400">Applicant:</span> <span className="font-medium">{captureTarget.fullName}</span></span>
-                  <span><span className="text-gray-400">Nationality:</span> <span className="font-medium">{captureTarget.nationality}</span></span>
+            <div className="flex items-center justify-between px-5 sm:px-6 py-2.5 border-b border-gray-100 bg-gray-50/50 shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <div>
+                  <h3 className="text-base font-bold text-gray-900 leading-none">Biometric Enrollment</h3>
+                  <p className="text-[11px] text-gray-500 mt-0.5">Capture and verify applicant biometric information</p>
+                </div>
+                <div className="hidden md:flex items-center gap-2 text-xs text-gray-600 bg-white px-3 py-1 rounded-xl border border-gray-200/80 shadow-xs">
+                  <span><span className="text-gray-400">App:</span> <span className="font-mono font-semibold text-gray-800">{captureTarget.appNo}</span></span>
+                  <span className="text-gray-300">•</span>
+                  <span><span className="text-gray-400">Case:</span> <span className="font-mono font-semibold text-gray-800">{captureTarget.caseNo}</span></span>
+                  <span className="text-gray-300">•</span>
+                  <span><span className="text-gray-400">Applicant:</span> <span className="font-semibold text-gray-800">{captureTarget.fullName}</span></span>
+                  <span className="text-gray-300">•</span>
+                  <span><span className="text-gray-400">Nat:</span> <span className="font-semibold text-gray-800">{captureTarget.nationality}</span></span>
                 </div>
               </div>
-              <button onClick={closeCapture} className="p-1.5 rounded-lg hover:bg-gray-200 text-gray-400 transition-colors shrink-0"><X className="h-4 w-4" /></button>
+              <button onClick={closeCapture} className="p-1 rounded-lg hover:bg-gray-200 text-gray-400 transition-colors shrink-0"><X className="h-4 w-4" /></button>
             </div>
 
             {/* Step Navigation */}
-            <div className="px-5 sm:px-6 py-4 border-b border-gray-100 shrink-0">
+            <div className="px-5 sm:px-6 py-2 border-b border-gray-100 shrink-0 bg-white">
               <div className="flex items-center justify-center gap-2 sm:gap-4">
                 {[
                   { n: 1, label: 'Photo', icon: Camera },
@@ -1430,12 +2142,12 @@ export default function Biometric() {
                   const isCompleted = captureStep > step.n || (step.n === 1 && photoSaved) || (step.n === 2 && canProceedFromStep2()) || (step.n === 3 && signatureCaptured);
                   return (
                     <React.Fragment key={step.n}>
-                      {idx > 0 && <div className={`hidden sm:block flex-1 h-0.5 max-w-16 ${isCompleted ? 'bg-icrcs-gold' : 'bg-gray-200'}`} />}
-                      <button onClick={() => { if (isCompleted) setCaptureStep(step.n); }} className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-all ${isActive ? 'bg-icrcs-navy text-white shadow-sm' : isCompleted ? 'text-icrcs-gold' : 'text-gray-400'}`}>
-                        <div className={`h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold ${isActive ? 'bg-white text-icrcs-navy' : isCompleted ? 'bg-icrcs-gold text-white' : 'bg-gray-200 text-gray-500'}`}>
-                          {isCompleted && !isActive ? <CheckCircle className="h-3.5 w-3.5" strokeWidth={3} /> : step.n}
+                      {idx > 0 && <div className={`hidden sm:block flex-1 h-0.5 max-w-12 ${isCompleted ? 'bg-icrcs-gold' : 'bg-gray-200'}`} />}
+                      <button onClick={() => { if (isCompleted) setCaptureStep(step.n); }} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl transition-all text-xs font-semibold ${isActive ? 'bg-icrcs-navy text-white shadow-xs' : isCompleted ? 'text-icrcs-gold' : 'text-gray-400'}`}>
+                        <div className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold ${isActive ? 'bg-white text-icrcs-navy' : isCompleted ? 'bg-icrcs-gold text-white' : 'bg-gray-200 text-gray-500'}`}>
+                          {isCompleted && !isActive ? <CheckCircle className="h-3 w-3" strokeWidth={3} /> : step.n}
                         </div>
-                        <span className="text-sm font-semibold hidden sm:inline">{step.label}</span>
+                        <span className="hidden sm:inline">{step.label}</span>
                       </button>
                     </React.Fragment>
                   );
@@ -1444,7 +2156,7 @@ export default function Biometric() {
             </div>
 
             {/* Step Content */}
-            <div className="relative flex-1 overflow-y-auto p-5 sm:p-6 min-h-[320px]">
+            <div className="relative flex-1 overflow-y-auto p-4 sm:p-5">
               {/* Step 1: Photo Capture */}
               {captureStep === 1 && (
                 <div className="space-y-5 max-w-5xl mx-auto">
@@ -1456,7 +2168,7 @@ export default function Biometric() {
                         <div className="h-2 w-2 rounded-full bg-icrcs-navy" />
                         Live Camera Preview
                       </h4>
-                      <div className="flex-1 min-h-[160px] rounded-xl border-2 border-gray-100 bg-gray-50 flex flex-col items-center justify-center overflow-hidden relative">
+                      <div className="h-[190px] sm:h-[210px] w-full rounded-xl border-2 border-gray-100 bg-gray-50 flex flex-col items-center justify-center overflow-hidden relative shrink-0">
                         {photoCaptured ? (
                           photoPreview ? (
                             <div className="w-full h-full relative flex items-center justify-center">
@@ -1477,14 +2189,18 @@ export default function Biometric() {
                             </div>
                           )
                         ) : cameraStarted ? (
-                          <div className="w-full h-full flex items-center justify-center relative">
-                            <svg viewBox="0 0 120 100" className="w-16 h-auto text-gray-300">
-                              <rect x="15" y="10" width="70" height="80" rx="12" fill="none" stroke="currentColor" strokeWidth="3" />
-                              <path d="M 85 35 L 110 20 L 110 80 L 85 65 Z" fill="none" stroke="currentColor" strokeWidth="3" />
-                              <circle cx="50" cy="50" r="14" fill="none" stroke="currentColor" strokeWidth="2.5" />
-                            </svg>
+                          <div className="w-full h-full flex items-center justify-center relative bg-black">
+                            {cameraLiveFrame ? (
+                              <img
+                                src={cameraLiveFrame.startsWith('data:') ? cameraLiveFrame : `data:image/jpeg;base64,${cameraLiveFrame}`}
+                                alt="Live camera preview"
+                                className="w-full h-full object-contain"
+                              />
+                            ) : (
+                              <Loader2 className="h-8 w-8 text-gray-500 animate-spin" />
+                            )}
                             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                              <div className="w-24 h-32 border-2 border-dashed border-icrcs-navy/25 rounded-[50%]" />
+                              <div className="w-24 h-32 border-2 border-dashed border-white/30 rounded-[50%]" />
                             </div>
                             <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2 py-1 rounded-full bg-green-50 border border-green-200">
                               <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
@@ -1530,7 +2246,7 @@ export default function Biometric() {
                         <CheckCircle className="h-4 w-4 text-green-500" strokeWidth={2.5} />
                         Captured Photo Preview
                       </h4>
-                      <div className="flex-1 min-h-[160px] rounded-xl border-2 border-gray-100 bg-gray-50 flex flex-col items-center justify-center overflow-hidden">
+                      <div className="h-[190px] sm:h-[210px] w-full rounded-xl border-2 border-gray-100 bg-gray-50 flex flex-col items-center justify-center overflow-hidden shrink-0">
                         {photoCaptured ? (
                           photoPreview ? (
                             <div className="w-full h-full relative flex items-center justify-center">
@@ -1708,36 +2424,6 @@ export default function Biometric() {
                   { hand: 'right', name: 'ring', label: 'Right Ring' },
                   { hand: 'right', name: 'pinky', label: 'Right Little' },
                 ];
-                const FingerPrintSVG = ({ color = '#0f2b5c', opacity = 0.4 }) => (
-                  <svg viewBox="0 0 100 120" className="w-full h-full">
-                    <g fill="none" stroke={color} strokeWidth="1.2" opacity={opacity}>
-                      <ellipse cx="50" cy="55" rx="28" ry="32" />
-                      <ellipse cx="50" cy="55" rx="22" ry="26" />
-                      <ellipse cx="50" cy="55" rx="16" ry="20" />
-                      <ellipse cx="50" cy="55" rx="10" ry="14" />
-                      <ellipse cx="50" cy="55" rx="5" ry="7" />
-                      <path d="M 50 23 Q 65 25 72 40" />
-                      <path d="M 50 23 Q 35 25 28 40" />
-                      <path d="M 76 48 Q 82 55 78 65" />
-                      <path d="M 24 48 Q 18 55 22 65" />
-                      <path d="M 50 87 Q 60 90 68 82" />
-                      <path d="M 50 87 Q 40 90 32 82" />
-                      <path d="M 72 72 Q 76 78 70 84" />
-                      <path d="M 28 72 Q 24 78 30 84" />
-                      <line x1="50" y1="23" x2="50" y2="30" />
-                      <line x1="50" y1="80" x2="50" y2="87" />
-                    </g>
-                  </svg>
-                );
-                // Renders the actual black-and-white fingerprint image returned by
-                // the scanner. Falls back to the ridge illustration only if the raw
-                // image is missing (older capture / device without image payload).
-                const FpImage = ({ hand, name, className = 'w-full h-full object-contain' }) => {
-                  const raw = capturedArtifactsRef.current?.[hand]?.[name]?.rawImage;
-                  if (!raw) return <FingerPrintSVG color="#10b981" opacity={0.5} />;
-                  const src = raw.startsWith('data:') ? raw : `data:image/png;base64,${raw}`;
-                  return <img src={src} alt={getFingerLabel(hand, name)} className={className} />;
-                };
                 const GroupResultRow = ({ hand, name, label }) => {
                   const status = fingerprints[hand][name];
                   const quality = fpQuality[hand][name];
@@ -1754,7 +2440,7 @@ export default function Biometric() {
                       <div className="flex items-center gap-1">
                         {status === 'pending' && <span className="text-sm text-gray-400">Pending</span>}
                         {status === 'capturing' && <Loader2 className="h-3 w-3 text-sky-500 animate-spin" />}
-                        {status === 'captured' && <CheckCircle className="h-3.5 w-3.5 text-green-500" strokeWidth={2.5} />}
+                        {status === 'captured' && <span className="h-2 w-2 rounded-full bg-green-500 inline-block" />}
                         {status === 'failed' && <X className="h-3.5 w-3.5 text-red-400" strokeWidth={2.5} />}
                         {status === 'exception' && (
                           <div className="flex items-center gap-1">
@@ -1782,41 +2468,25 @@ export default function Biometric() {
                   return (
                     <div className="flex flex-col items-center gap-1.5">
                       <button onClick={() => canCapture && captureGroup(groupKey)} disabled={!canCapture} className={`h-[140px] w-[140px] rounded-2xl border-2 flex items-center justify-center overflow-hidden transition-all ${previewStatus === 'captured' ? 'border-green-300 bg-green-50' : previewStatus === 'capturing' ? 'border-sky-400 bg-sky-50 animate-pulse' : previewStatus === 'failed' ? 'border-red-300 bg-red-50' : previewStatus === 'exception' ? 'border-amber-300 bg-amber-50' : canCapture ? 'border-gray-300 bg-gray-50 hover:border-icrcs-navy hover:bg-blue-50/30 cursor-pointer' : 'border-gray-200 bg-gray-50'} disabled:opacity-60 disabled:cursor-not-allowed`}>
-                        {previewStatus === 'captured' && (
+                        {previewStatus === 'captured' ? (
                           <div className={`w-full h-full p-1.5 grid gap-1 bg-white ${fingers.length === 2 ? 'grid-cols-2' : 'grid-cols-2 grid-rows-2'}`}>
                             {fingers.map(f => (
-                              <div key={f.name} className="rounded overflow-hidden bg-white flex items-center justify-center">
-                                <FpImage hand={f.hand} name={f.name} className="w-full h-full object-cover" />
+                              <div key={f.name} className="rounded overflow-hidden bg-white flex items-center justify-center relative">
+                                <FpImage hand={f.hand} name={f.name} compact />
                               </div>
                             ))}
                           </div>
-                        )}
-                        {previewStatus === 'pending' && (
-                          <div className="flex flex-col items-center justify-center gap-1 p-2">
-                            <Fingerprint className="h-12 w-12 text-gray-300" />
-                            <span className="text-xs text-gray-400 font-medium">Click to Capture</span>
-                          </div>
-                        )}
-                        {previewStatus === 'capturing' && (
-                          <div className="flex flex-col items-center justify-center gap-1 p-2">
-                            <Loader2 className="h-10 w-10 text-sky-500 animate-spin" />
-                            <span className="text-xs text-sky-500 font-medium">Scanning...</span>
-                          </div>
-                        )}
-                        {previewStatus === 'failed' && (
-                          <div className="flex flex-col items-center justify-center gap-1 p-2">
-                            <X className="h-10 w-10 text-red-400" strokeWidth={2.5} />
-                            <span className="text-xs text-red-400 font-medium">Failed</span>
-                          </div>
-                        )}
-                        {previewStatus === 'exception' && (
-                          <div className="flex flex-col items-center justify-center gap-1 p-2">
-                            <AlertTriangle className="h-10 w-10 text-amber-400" />
-                            <span className="text-xs text-amber-500 font-medium">Exception</span>
-                          </div>
+                        ) : previewStatus === 'capturing' ? (
+                          <Loader2 className="h-8 w-8 text-sky-500 animate-spin" />
+                        ) : previewStatus === 'failed' ? (
+                          <X className="h-8 w-8 text-red-500" strokeWidth={2.5} />
+                        ) : previewStatus === 'exception' ? (
+                          <AlertTriangle className="h-8 w-8 text-amber-500" />
+                        ) : (
+                          <Fingerprint className="h-10 w-10 text-gray-300" />
                         )}
                       </button>
-                      <span className="text-xs font-medium text-gray-500">{title}</span>
+                      <span className="text-xs font-bold text-gray-700">{title}</span>
                     </div>
                   );
                 };
@@ -1884,34 +2554,7 @@ export default function Biometric() {
                       </div>
                     )}
 
-                    {/* Live Scanner Preview - mirrors RSWAS's own CanvasInfo feed over
-                        the WebSocket opened in captureGroup/captureSingleFinger, so the
-                        operator sees the finger on the glass instantly instead of a bare
-                        spinner while the capture is in progress. */}
-                    {scanningFinger && (
-                      <div className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-gray-900 border border-gray-800">
-                        <div className="flex items-center justify-between w-full max-w-sm">
-                          <span className="flex items-center gap-1.5 text-xs font-bold text-red-400 uppercase tracking-wider">
-                            <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" /> Live
-                          </span>
-                          <span className="text-xs font-medium text-gray-300">Scanning: {getScanningLabel()}</span>
-                        </div>
-                        <div className="w-full max-w-sm h-[220px] rounded-xl bg-black flex items-center justify-center overflow-hidden">
-                          {livePreviewFrame ? (
-                            <img
-                              src={livePreviewFrame.startsWith('data:') ? livePreviewFrame : `data:image/png;base64,${livePreviewFrame}`}
-                              alt="Live scanner preview"
-                              className="w-full h-full object-contain"
-                            />
-                          ) : (
-                            <div className="flex flex-col items-center gap-2 text-gray-500">
-                              <Fingerprint className="h-10 w-10 animate-pulse" />
-                              <span className="text-xs font-medium">Place your hand on the scanner...</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
+
 
                     {/* Row 1: Left Four Fingers */}
                     <div className="space-y-2">
@@ -2016,6 +2659,52 @@ export default function Biometric() {
                         <Pen className="h-4 w-4 text-icrcs-navy" />
                         Signature Capture
                       </h4>
+
+                      {/* Signature pad (Wacom STU-430) - the real device, as an
+                          alternative to drawing below with a mouse/touch. */}
+                      <div className="mb-4 p-4 rounded-xl bg-gray-900 border border-gray-800">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-bold text-gray-300 uppercase tracking-wider">Signature Pad</span>
+                          {signaturePadActive && (
+                            <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-400 uppercase tracking-wider">
+                              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" /> Live
+                            </span>
+                          )}
+                        </div>
+                        <div className="h-[110px] rounded-lg bg-black flex items-center justify-center overflow-hidden">
+                          {signaturePadActive ? (
+                            signaturePadLiveFrame ? (
+                              <img
+                                src={signaturePadLiveFrame.startsWith('data:') ? signaturePadLiveFrame : `data:image/png;base64,${signaturePadLiveFrame}`}
+                                alt="Live signature pad preview"
+                                className="w-full h-full object-contain"
+                              />
+                            ) : (
+                              <span className="text-xs text-gray-500 font-medium">Sign on the pad now...</span>
+                            )
+                          ) : (
+                            <span className="text-xs text-gray-500 font-medium">Pad not connected</span>
+                          )}
+                        </div>
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          {!signaturePadActive ? (
+                            <button onClick={handleStartSignaturePad} className="px-3 py-1.5 rounded-lg bg-icrcs-navy text-white text-xs font-semibold hover:bg-icrcs-navy-light transition-colors">
+                              Connect Pad
+                            </button>
+                          ) : (
+                            <>
+                              <button onClick={handleCaptureFromPad} className="px-3 py-1.5 rounded-lg bg-green-600 text-white text-xs font-semibold hover:bg-green-700 transition-colors">
+                                Capture from Pad
+                              </button>
+                              <button onClick={handleClearPad} className="px-3 py-1.5 rounded-lg border border-gray-600 text-gray-300 text-xs font-medium hover:bg-gray-800 transition-colors">
+                                Clear Pad
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      <p className="text-xs font-medium text-gray-400 mb-2">Or draw manually:</p>
                       <div className="flex-1 min-h-[220px] rounded-xl border-2 border-gray-100 bg-gray-50 overflow-hidden relative">
                         <canvas
                           ref={sigCanvasRef}
@@ -2251,7 +2940,7 @@ export default function Biometric() {
                   }}
                   className="px-5 py-2.5 rounded-xl bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 transition-colors shadow-sm flex items-center gap-1.5"
                 >
-                  <CheckCircle className="h-4 w-4" /> Wave Biometrics
+                  <CheckCircle className="h-4 w-4" /> Waive Biometrics
                 </button>
                 {captureStep < 3 && (
                   <button
@@ -2262,11 +2951,93 @@ export default function Biometric() {
                 {captureStep === 3 && (
                   <button
                     onClick={completeEnrollment}
-                    className="px-5 py-2.5 rounded-xl bg-icrcs-gold text-white text-sm font-semibold hover:bg-yellow-500 transition-colors shadow-sm"
+                    disabled={!canCompleteEnrollment() || waveMsg.type === 'info'}
+                    className="px-5 py-2.5 rounded-xl bg-icrcs-gold text-white text-sm font-semibold hover:bg-yellow-500 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
                   >Complete Enrollment</button>
                 )}
               </div>
             </div>
+            {/* Global Live Scanner Preview Modal Dialog */}
+            {previewVisible && (
+              <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-fadeIn">
+                <div className="bg-slate-900 border border-slate-700/80 rounded-3xl p-6 max-w-lg w-full shadow-2xl flex flex-col items-center gap-4 relative overflow-hidden text-white">
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-2">
+                      {scanningFinger ? (
+                        <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-950/80 border border-red-500/40 text-xs font-bold text-red-400 uppercase tracking-wider animate-pulse">
+                          <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" /> Live Scanner Stream
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-950/80 border border-amber-500/40 text-xs font-bold text-amber-400 uppercase tracking-wider">
+                          <span className="h-2 w-2 rounded-full bg-amber-500" /> Capture Failed
+                        </span>
+                      )}
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-slate-300">
+                        {getScanningLabel()}
+                      </span>
+                      <button onClick={dismissLivePreview} className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors" title="Close">
+                        <X className="h-5 w-5" strokeWidth={2.5} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="w-full h-[300px] sm:h-[340px] rounded-2xl bg-white border border-slate-700/50 flex items-center justify-center overflow-hidden p-2 shadow-inner">
+                    {livePreviewFrame ? (
+                      <img
+                        src={livePreviewFrame.startsWith('data:') ? livePreviewFrame : `data:image/png;base64,${livePreviewFrame}`}
+                        alt="Live scanner preview"
+                        className="w-full h-full object-contain"
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center gap-3 text-slate-400">
+                        <Fingerprint className="h-16 w-16 animate-pulse text-slate-400" />
+                        <span className="text-sm font-medium text-slate-300">{liveGuidance || 'Place your hand on the scanner...'}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {livePreviewFrame && liveGuidance && (
+                    <span className={`text-xs font-bold px-4 py-1.5 rounded-full border text-center ${liveGuidance && FAILURE_GUIDANCE_RE.test(liveGuidance) ? 'text-amber-300 bg-amber-950/80 border-amber-500/40' : 'text-sky-300 bg-sky-950/50 border-sky-800/40'}`}>
+                      {liveGuidance}
+                    </span>
+                  )}
+
+                  {/* Temporary diagnostic readout - shows RSWAS's raw live well-scored-finger
+                      count so we can watch, on the real device, whether it ever climbs before
+                      the job finishes, without needing the browser console open. */}
+                  {scanningFinger && (
+                    <span className="text-[11px] font-mono text-slate-500">
+                      diag: detected {liveDetectedCount}/{previewTarget?.group ? GROUP_FINGERS[previewTarget.group].length : 1}
+                    </span>
+                  )}
+
+                  {(!scanningFinger || (liveGuidance && FAILURE_GUIDANCE_RE.test(liveGuidance))) && (
+                    <div className="flex items-center gap-3 w-full pt-1">
+                      <button
+                        onClick={() => {
+                          setScanningFinger(null);
+                          setPreviewConfirming(false);
+                          setLivePreviewFrame(null);
+                          setLiveGuidance('');
+                          if (previewTarget?.group) captureGroup(previewTarget.group, true);
+                          else if (previewTarget) captureSingleFinger(previewTarget.hand, previewTarget.name);
+                        }}
+                        className="flex-1 py-2.5 rounded-xl bg-amber-500 text-white font-bold text-sm hover:bg-amber-600 transition-colors shadow-sm flex items-center justify-center gap-2"
+                      >
+                        <RefreshCw className="h-4 w-4" />
+                        Retry Capture
+                      </button>
+                      <button onClick={dismissLivePreview} className="px-5 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 hover:text-white transition-colors">
+                        Close
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

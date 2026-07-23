@@ -3,23 +3,12 @@ import{ClipboardCheck,CheckCircle,XCircle,AlertTriangle,ClipboardList,Search,Che
 import AssessmentWorkspace from'../components/AssessmentWorkspace';
 import{getAssessmentQueue,assessCase}from'../../../services/managementService';
 
-const mockAssessments=[
-{caseNo:'ICRCS-ASM-2026-000120',appNo:'APP-2026-000145',fullName:'John Michael Doe',nationality:'Kenyan',gender:'Male',dob:'10-Jan-1990',passportNo:'A12345678',status:'Under Assessment',priority:'High',assignedDate:'12-Jun-2026',officer:'Grace Temu',documents:['passport_copy.pdf','birth_cert.jpg']},
-{caseNo:'ICRCS-ASM-2026-000119',appNo:'APP-2026-000146',fullName:'Amina Hassan',nationality:'Tanzanian',gender:'Female',dob:'15-Mar-1988',passportNo:'T98765432',status:'Pending Assessment',priority:'Medium',assignedDate:'11-Jun-2026',officer:'James Otieno',documents:['passport.pdf']},
-{caseNo:'ICRCS-ASM-2026-000118',appNo:'APP-2026-000147',fullName:'Robert Kimaro',nationality:'Kenyan',gender:'Male',dob:'22-Jul-1992',passportNo:'A87654321',status:'In Progress',priority:'High',assignedDate:'10-Jun-2026',officer:'Grace Temu',documents:['id_card.jpg','utility_bill.pdf']},
-{caseNo:'ICRCS-ASM-2026-000117',appNo:'APP-2026-000148',fullName:'Halima Said',nationality:'Rwandan',gender:'Female',dob:'05-Nov-1985',passportNo:'R11223344',status:'Under Assessment',priority:'Low',assignedDate:'09-Jun-2026',officer:'Juma Kipanya',documents:['passport.pdf','marriage_cert.jpg']},
-{caseNo:'ICRCS-ASM-2026-000116',appNo:'APP-2026-000149',fullName:'Michael Bwire',nationality:'Ugandan',gender:'Male',dob:'18-Sep-1995',passportNo:'U55667788',status:'Completed',priority:'Medium',assignedDate:'08-Jun-2026',officer:'James Otieno',documents:['passport.pdf']},
-{caseNo:'ICRCS-ASM-2026-000115',appNo:'APP-2026-000150',fullName:'Fatma Juma',nationality:'Burundian',gender:'Female',dob:'30-Jan-1990',passportNo:'B99887766',status:'Escalated',priority:'High',assignedDate:'07-Jun-2026',officer:'Grace Temu',documents:['passport.jpg','ref_letter.pdf']},
-{caseNo:'ICRCS-ASM-2026-000114',appNo:'APP-2026-000151',fullName:'Peter Ochieng',nationality:'Kenyan',gender:'Male',dob:'12-Apr-1987',passportNo:'A33445566',status:'Pending Assessment',priority:'Medium',assignedDate:'06-Jun-2026',officer:'Juma Kipanya',documents:['passport.pdf']},
-{caseNo:'ICRCS-ASM-2026-000113',appNo:'APP-2026-000152',fullName:'Joyce Mwende',nationality:'Tanzanian',gender:'Female',dob:'25-Dec-1993',passportNo:'T77889900',status:'In Progress',priority:'Low',assignedDate:'05-Jun-2026',officer:'Grace Temu',documents:['id_card.jpg']},
-{caseNo:'ICRCS-ASM-2026-000112',appNo:'APP-2026-000153',fullName:'Daniel Ndayisaba',nationality:'Burundian',gender:'Male',dob:'08-Jun-1991',passportNo:'B22334455',status:'Under Assessment',priority:'High',assignedDate:'04-Jun-2026',officer:'James Otieno',documents:['passport.pdf','employment_letter.pdf']},
-{caseNo:'ICRCS-ASM-2026-000111',appNo:'APP-2026-000154',fullName:'Grace Akello',nationality:'Ugandan',gender:'Female',dob:'14-Feb-1989',passportNo:'U66778899',status:'Completed',priority:'Medium',assignedDate:'03-Jun-2026',officer:'Juma Kipanya',documents:['passport.jpg']},
-{caseNo:'ICRCS-ASM-2026-000110',appNo:'APP-2026-000155',fullName:'Samuel Kagame',nationality:'Rwandan',gender:'Male',dob:'19-Oct-1994',passportNo:'R44556677',status:'Pending Assessment',priority:'Low',assignedDate:'02-Jun-2026',officer:'Grace Temu',documents:['passport.pdf']},
-{caseNo:'ICRCS-ASM-2026-000109',appNo:'APP-2026-000156',fullName:'Esther Wanjiku',nationality:'Kenyan',gender:'Female',dob:'03-May-1986',passportNo:'A55667788',status:'Under Assessment',priority:'High',assignedDate:'01-Jun-2026',officer:'James Otieno',documents:['passport.pdf','medical_cert.jpg']},
-];
-
-const statusBadge=s=>{const m={'Pending Assessment':'bg-sky-50 text-sky-700 border-sky-200','Under Assessment':'bg-amber-50 text-amber-700 border-amber-200','In Progress':'bg-blue-50 text-blue-700 border-blue-200','Completed':'bg-green-50 text-green-700 border-green-200','Escalated':'bg-red-50 text-red-700 border-red-200'};return m[s]||'bg-gray-50 text-gray-600 border-gray-200'};
-const priorityBadge=p=>{const m={'High':'bg-red-50 text-red-700 border-red-200','Medium':'bg-amber-50 text-amber-700 border-amber-200','Low':'bg-green-50 text-green-700 border-green-200'};return m[p]||'bg-gray-50 text-gray-600 border-gray-200'};
+const STATUS_LABELS={PENDING_ASSESSMENT:'Pending Assessment',UNDER_ASSESSMENT:'Under Assessment',ASSESSMENT_COMPLETE:'Assessment Complete'};
+const statusLabel=s=>STATUS_LABELS[s]||s;
+const statusBadge=s=>{const m={PENDING_ASSESSMENT:'bg-sky-50 text-sky-700 border-sky-200',UNDER_ASSESSMENT:'bg-amber-50 text-amber-700 border-amber-200',ASSESSMENT_COMPLETE:'bg-green-50 text-green-700 border-green-200'};return m[s]||'bg-gray-50 text-gray-600 border-gray-200'};
+const PRIORITY_LABELS={HIGH:'High',MEDIUM:'Medium',LOW:'Low'};
+const priorityLabel=p=>PRIORITY_LABELS[p]||p;
+const priorityBadge=p=>{const m={HIGH:'bg-red-50 text-red-700 border-red-200',MEDIUM:'bg-amber-50 text-amber-700 border-amber-200',LOW:'bg-green-50 text-green-700 border-green-200'};return m[p]||'bg-gray-50 text-gray-600 border-gray-200'};
 
 export default function Assessment(){
 const[assessments,setAssessments]=useState([]);
@@ -49,7 +38,7 @@ const loadQueue=useCallback(async()=>{
       dob:c.dateOfBirth,
       status:c.status,
       priority:c.priority,
-      assignedDate:c.assignedDate,
+      assignedDate:c.assignedDate||c.createdAt,
       officer:c.assignedOfficerName||'',
       registrationType:c.registrationType,
     }));
@@ -93,10 +82,9 @@ const handleSubmit=async(caseNo,formData)=>{
 
 const kpis=[
 {label:'Total Assigned',value:assessments.length,color:'bg-icrcs-navy',icon:ClipboardList},
-{label:'Pending',value:assessments.filter(a=>a.status==='Pending Assessment').length,color:'bg-sky-500',icon:AlertTriangle},
-{label:'In Progress',value:assessments.filter(a=>a.status==='In Progress'||a.status==='Under Assessment').length,color:'bg-blue-500',icon:RotateCcw},
-{label:'Completed',value:assessments.filter(a=>a.status==='Completed').length,color:'bg-green-500',icon:CheckCircle},
-{label:'Escalated',value:assessments.filter(a=>a.status==='Escalated').length,color:'bg-red-500',icon:XCircle},
+{label:'Pending',value:assessments.filter(a=>a.status==='PENDING_ASSESSMENT').length,color:'bg-sky-500',icon:AlertTriangle},
+{label:'Under Assessment',value:assessments.filter(a=>a.status==='UNDER_ASSESSMENT').length,color:'bg-blue-500',icon:RotateCcw},
+{label:'Completed',value:assessments.filter(a=>a.status==='ASSESSMENT_COMPLETE').length,color:'bg-green-500',icon:CheckCircle},
 ];
 
 return(
@@ -116,8 +104,8 @@ return(
   <div className="p-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center gap-3">
    <div className="relative flex-1 max-w-sm"><Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/><input type="text" value={search} onChange={e=>{setSearch(e.target.value);setCurrentPage(1);}} placeholder="Search case, app no, or name..." className="w-full pl-9 pr-4 py-2 rounded-xl border border-gray-200 bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-icrcs-navy/20 focus:border-icrcs-navy transition-all"/></div>
    <div className="flex items-center gap-2">
-    <div className="relative"><select value={statusFilter} onChange={e=>{setStatusFilter(e.target.value);setCurrentPage(1);}} className="appearance-none pl-3 pr-8 py-2 rounded-xl border border-gray-200 bg-gray-50 text-xs font-medium text-gray-600 focus:outline-none focus:ring-2 focus:ring-icrcs-navy/20 cursor-pointer"><option value="All">All Status</option><option value="Pending Assessment">Pending</option><option value="Under Assessment">Under Assessment</option><option value="In Progress">In Progress</option><option value="Completed">Completed</option><option value="Escalated">Escalated</option></select><ChevronDown className="h-3.5 w-3.5 text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"/></div>
-    <div className="relative"><select value={priorityFilter} onChange={e=>{setPriorityFilter(e.target.value);setCurrentPage(1);}} className="appearance-none pl-3 pr-8 py-2 rounded-xl border border-gray-200 bg-gray-50 text-xs font-medium text-gray-600 focus:outline-none focus:ring-2 focus:ring-icrcs-navy/20 cursor-pointer"><option value="All">All Priority</option><option value="High">High</option><option value="Medium">Medium</option><option value="Low">Low</option></select><ChevronDown className="h-3.5 w-3.5 text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"/></div>
+    <div className="relative"><select value={statusFilter} onChange={e=>{setStatusFilter(e.target.value);setCurrentPage(1);}} className="appearance-none pl-3 pr-8 py-2 rounded-xl border border-gray-200 bg-gray-50 text-xs font-medium text-gray-600 focus:outline-none focus:ring-2 focus:ring-icrcs-navy/20 cursor-pointer"><option value="All">All Status</option><option value="PENDING_ASSESSMENT">Pending Assessment</option><option value="UNDER_ASSESSMENT">Under Assessment</option><option value="ASSESSMENT_COMPLETE">Assessment Complete</option></select><ChevronDown className="h-3.5 w-3.5 text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"/></div>
+    <div className="relative"><select value={priorityFilter} onChange={e=>{setPriorityFilter(e.target.value);setCurrentPage(1);}} className="appearance-none pl-3 pr-8 py-2 rounded-xl border border-gray-200 bg-gray-50 text-xs font-medium text-gray-600 focus:outline-none focus:ring-2 focus:ring-icrcs-navy/20 cursor-pointer"><option value="All">All Priority</option><option value="HIGH">High</option><option value="MEDIUM">Medium</option><option value="LOW">Low</option></select><ChevronDown className="h-3.5 w-3.5 text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"/></div>
    </div>
   </div>
 
@@ -137,8 +125,8 @@ return(
       <td className="px-4 py-3 font-mono text-gray-700">{row.caseNo}</td>
       <td className="px-4 py-3 font-mono text-gray-700">{row.appNo}</td>
       <td className="px-4 py-3"><div className="font-medium text-sm text-gray-800">{row.fullName}</div><div className="text-sm text-gray-400">{row.nationality}</div></td>
-      <td className="px-4 py-3"><span className={`text-sm px-2 py-0.5 rounded-full border font-medium ${statusBadge(row.status)}`}>{row.status}</span></td>
-      <td className="px-4 py-3"><span className={`text-sm px-2 py-0.5 rounded-full border font-medium ${priorityBadge(row.priority)}`}>{row.priority}</span></td>
+      <td className="px-4 py-3"><span className={`text-sm px-2 py-0.5 rounded-full border font-medium ${statusBadge(row.status)}`}>{statusLabel(row.status)}</span></td>
+      <td className="px-4 py-3"><span className={`text-sm px-2 py-0.5 rounded-full border font-medium ${priorityBadge(row.priority)}`}>{priorityLabel(row.priority)}</span></td>
       <td className="px-4 py-3 text-sm text-gray-500">{row.assignedDate}</td>
       <td className="px-4 py-3 text-right"><button onClick={()=>openWorkspace(row)} className="px-2.5 py-1.5 rounded-lg bg-icrcs-navy text-white text-sm font-semibold hover:bg-icrcs-navy-light transition-colors shadow-sm flex items-center gap-1 ml-auto"><FolderOpen className="h-3 w-3"/>Open</button></td>
      </tr>)}
