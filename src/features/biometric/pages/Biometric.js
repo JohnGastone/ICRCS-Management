@@ -1730,65 +1730,11 @@ export default function Biometric() {
                     </div>
                   );
                 };
-                const PreviewBox = ({ title, groupKey, fingers }) => {
-                  const statuses = fingers.map(f => fingerprints[f.hand][f.name]);
-                  const allCaptured = statuses.every(s => s === 'captured');
-                  const anyCapturing = statuses.some(s => s === 'capturing');
-                  const anyPending = statuses.some(s => s === 'pending');
-                  const anyFailed = statuses.some(s => s === 'failed');
-                  const allException = statuses.every(s => s === 'exception');
-                  let previewStatus = 'pending';
-                  if (allCaptured) previewStatus = 'captured';
-                  else if (anyCapturing) previewStatus = 'capturing';
-                  else if (allException) previewStatus = 'exception';
-                  else if (anyFailed) previewStatus = 'failed';
-                  const canCapture = anyPending && !scanningFinger;
-                  return (
-                    <div className="flex flex-col items-center gap-1.5">
-                      <button onClick={() => canCapture && captureGroup(groupKey)} disabled={!canCapture} className={`h-[140px] w-[140px] rounded-2xl border-2 flex items-center justify-center overflow-hidden transition-all ${previewStatus === 'captured' ? 'border-green-300 bg-green-50' : previewStatus === 'capturing' ? 'border-sky-400 bg-sky-50 animate-pulse' : previewStatus === 'failed' ? 'border-red-300 bg-red-50' : previewStatus === 'exception' ? 'border-amber-300 bg-amber-50' : canCapture ? 'border-gray-300 bg-gray-50 hover:border-icrcs-navy hover:bg-blue-50/30 cursor-pointer' : 'border-gray-200 bg-gray-50'} disabled:opacity-60 disabled:cursor-not-allowed`}>
-                        {previewStatus === 'captured' && (
-                          <div className={`w-full h-full p-1.5 grid gap-1 bg-white ${fingers.length === 2 ? 'grid-cols-2' : 'grid-cols-2 grid-rows-2'}`}>
-                            {fingers.map(f => (
-                              <div key={f.name} className="rounded overflow-hidden bg-white flex items-center justify-center">
-                                <FpImage hand={f.hand} name={f.name} className="w-full h-full object-cover" />
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        {previewStatus === 'pending' && (
-                          <div className="flex flex-col items-center justify-center gap-1 p-2">
-                            <Fingerprint className="h-12 w-12 text-gray-300" />
-                            <span className="text-xs text-gray-400 font-medium">Click to Capture</span>
-                          </div>
-                        )}
-                        {previewStatus === 'capturing' && (
-                          <div className="flex flex-col items-center justify-center gap-1 p-2">
-                            <Loader2 className="h-10 w-10 text-sky-500 animate-spin" />
-                            <span className="text-xs text-sky-500 font-medium">Scanning...</span>
-                          </div>
-                        )}
-                        {previewStatus === 'failed' && (
-                          <div className="flex flex-col items-center justify-center gap-1 p-2">
-                            <X className="h-10 w-10 text-red-400" strokeWidth={2.5} />
-                            <span className="text-xs text-red-400 font-medium">Failed</span>
-                          </div>
-                        )}
-                        {previewStatus === 'exception' && (
-                          <div className="flex flex-col items-center justify-center gap-1 p-2">
-                            <AlertTriangle className="h-10 w-10 text-amber-400" />
-                            <span className="text-xs text-amber-500 font-medium">Exception</span>
-                          </div>
-                        )}
-                      </button>
-                      <span className="text-xs font-medium text-gray-500">{title}</span>
-                    </div>
-                  );
-                };
                 const MiniFingerBox = ({ hand, name, label }) => {
                   const status = fingerprints[hand][name];
                   const isSelected = selectedFinger && selectedFinger.hand === hand && selectedFinger.name === name;
                   return (
-                    <button onClick={() => setSelectedFinger({ hand, name })} className={`relative flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all h-[140px] w-[140px] ${isSelected ? 'ring-2 ring-icrcs-navy ring-offset-1 border-icrcs-navy' : status === 'captured' ? 'border-green-300' : status === 'capturing' ? 'border-sky-400' : status === 'failed' ? 'border-red-300' : status === 'exception' ? 'border-amber-300' : 'border-gray-200 hover:border-icrcs-navy/40'}`}>
+                    <button onClick={() => setSelectedFinger({ hand, name })} className={`relative flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all h-[8.75rem] w-[8.75rem] ${isSelected ? 'ring-2 ring-icrcs-navy ring-offset-1 border-icrcs-navy' : status === 'captured' ? 'border-green-300' : status === 'capturing' ? 'border-sky-400' : status === 'failed' ? 'border-red-300' : status === 'exception' ? 'border-amber-300' : 'border-gray-200 hover:border-icrcs-navy/40'}`}>
                       <div className={`w-full flex-1 rounded-lg flex items-center justify-center ${status === 'captured' ? 'bg-green-50' : status === 'capturing' ? 'bg-sky-50' : status === 'failed' ? 'bg-red-50' : status === 'exception' ? 'bg-amber-50' : 'bg-gray-50'}`}>
                         {status === 'pending' && <Fingerprint className="h-8 w-8 text-gray-300" />}
                         {status === 'capturing' && <Loader2 className="h-8 w-8 text-sky-500 animate-spin" />}
@@ -1798,6 +1744,35 @@ export default function Biometric() {
                       </div>
                       <span className="text-sm text-gray-500 whitespace-nowrap">{label}</span>
                     </button>
+                  );
+                };
+                // Capture / recapture actions for one placement group. The group
+                // name lives on the capture button itself, so there is no separate
+                // heading row above each set of fingers.
+                const GroupActions = ({ title, groupKey }) => {
+                  const fingers = GROUP_FINGERS[groupKey];
+                  const statuses = fingers.map(f => fingerprints[f.hand][f.name]);
+                  const anyPending = statuses.some(s => s === 'pending');
+                  const anyCaptured = statuses.some(s => s !== 'pending');
+                  const isScanning = scanningFinger && scanningFinger.group === groupKey;
+                  return (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        onClick={() => captureGroup(groupKey)}
+                        disabled={!anyPending || !!scanningFinger}
+                        className="px-4 py-2 rounded-lg bg-icrcs-navy text-white text-sm font-semibold hover:bg-icrcs-navy-light transition-colors shadow-sm flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        {isScanning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Fingerprint className="h-4 w-4" />}
+                        {isScanning ? 'Scanning…' : `Capture ${title}`}
+                      </button>
+                      <button
+                        onClick={() => recaptureGroup(groupKey)}
+                        disabled={!anyCaptured || !!scanningFinger}
+                        className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-600 hover:bg-white transition-colors flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <RefreshCw className="h-3 w-3" /> Recapture
+                      </button>
+                    </div>
                   );
                 };
                 return (
@@ -1879,9 +1854,8 @@ export default function Biometric() {
 
                     {/* Row 1: Left Four Fingers */}
                     <div className="space-y-2">
-                      <h5 className="text-sm font-medium text-gray-500 uppercase tracking-wider">Left Four Fingers</h5>
+                      <GroupActions title="Left Four Fingers" groupKey="left" />
                       <div className="flex gap-3 sm:gap-4 items-start justify-center flex-wrap">
-                        <PreviewBox title="Group" groupKey="left" fingers={[{ hand: 'left', name: 'index' }, { hand: 'left', name: 'middle' }, { hand: 'left', name: 'ring' }, { hand: 'left', name: 'pinky' }]} />
                         <MiniFingerBox hand="left" name="index" label="Left Index" />
                         <MiniFingerBox hand="left" name="middle" label="Left Middle" />
                         <MiniFingerBox hand="left" name="ring" label="Left Ring" />
@@ -1891,9 +1865,8 @@ export default function Biometric() {
 
                     {/* Row 2: Two Thumbs */}
                     <div className="space-y-2">
-                      <h5 className="text-sm font-medium text-gray-500 uppercase tracking-wider">Two Thumbs</h5>
+                      <GroupActions title="Thumbs" groupKey="thumbs" />
                       <div className="flex gap-3 sm:gap-4 items-start justify-center flex-wrap">
-                        <PreviewBox title="Thumbs" groupKey="thumbs" fingers={[{ hand: 'thumbs', name: 'left' }, { hand: 'thumbs', name: 'right' }]} />
                         <MiniFingerBox hand="thumbs" name="left" label="Left Thumb" />
                         <MiniFingerBox hand="thumbs" name="right" label="Right Thumb" />
                       </div>
@@ -1901,9 +1874,8 @@ export default function Biometric() {
 
                     {/* Row 3: Right Four Fingers */}
                     <div className="space-y-2">
-                      <h5 className="text-sm font-medium text-gray-500 uppercase tracking-wider">Right Four Fingers</h5>
+                      <GroupActions title="Right Four Fingers" groupKey="right" />
                       <div className="flex gap-3 sm:gap-4 items-start justify-center flex-wrap">
-                        <PreviewBox title="Group" groupKey="right" fingers={[{ hand: 'right', name: 'index' }, { hand: 'right', name: 'middle' }, { hand: 'right', name: 'ring' }, { hand: 'right', name: 'pinky' }]} />
                         <MiniFingerBox hand="right" name="index" label="Right Index" />
                         <MiniFingerBox hand="right" name="middle" label="Right Middle" />
                         <MiniFingerBox hand="right" name="ring" label="Right Ring" />
@@ -1943,20 +1915,8 @@ export default function Biometric() {
                         )}
                         <button onClick={() => { setFingerprints({ left: { index: 'pending', middle: 'pending', ring: 'pending', pinky: 'pending' }, right: { index: 'pending', middle: 'pending', ring: 'pending', pinky: 'pending' }, thumbs: { left: 'pending', right: 'pending' } }); setFpQuality({ left: { index: 0, middle: 0, ring: 0, pinky: 0 }, right: { index: 0, middle: 0, ring: 0, pinky: 0 }, thumbs: { left: 0, right: 0 } }); setFpComments({ left: { index: '', middle: '', ring: '', pinky: '' }, right: { index: '', middle: '', ring: '', pinky: '' }, thumbs: { left: '', right: '' } }); capturedArtifactsRef.current = { left: {}, right: {}, thumbs: {} }; setSelectedFinger(null); }} disabled={scanningFinger} className="px-4 py-2 rounded-xl border border-gray-200 text-xs font-medium text-gray-500 hover:bg-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed">Recapture All</button>
                       </div>
-                      {/* Per-group recapture — resets only the chosen placement, keeping other captured groups intact */}
-                      {(['left', 'thumbs', 'right']).some(g => GROUP_FINGERS[g].some(f => fingerprints[f.hand][f.name] !== 'pending')) && (
-                        <div className="flex flex-wrap items-center gap-2 pt-1">
-                          <span className="text-xs font-medium text-gray-400">Recapture group:</span>
-                          {(['left', 'thumbs', 'right']).map(g => {
-                            const hasCaptured = GROUP_FINGERS[g].some(f => fingerprints[f.hand][f.name] !== 'pending');
-                            return (
-                              <button key={g} onClick={() => recaptureGroup(g)} disabled={scanningFinger || !hasCaptured} className="px-3 py-1.5 rounded-xl border border-gray-200 text-xs font-medium text-gray-600 hover:bg-white transition-colors flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed">
-                                <RefreshCw className="h-3 w-3" /> {GROUP_LABELS[g]}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
+                      {/* Per-group capture/recapture now lives next to each group
+                          group of fingers (see GroupActions), so no duplicate row here. */}
                     </div>
 
                     {canProceedFromStep2() && (
@@ -2199,6 +2159,9 @@ export default function Biometric() {
                 )}
               </div>
               <div className="flex items-center gap-2">
+                {/* Not offered on the Photo step — biometrics can only be waved
+                    once fingerprint capture has started. */}
+                {captureStep > 1 && (
                 <button
                   onClick={async () => {
                     if (!captureTarget) return;
@@ -2217,6 +2180,7 @@ export default function Biometric() {
                 >
                   <CheckCircle className="h-4 w-4" /> Wave Biometrics
                 </button>
+                )}
                 {captureStep < 3 && (
                   <button
                     onClick={() => setCaptureStep(captureStep + 1)}
